@@ -4,8 +4,14 @@ import { getMitmAlias, setMitmAliasAll } from "@/models";
 import { getMitmStatus } from "@/mitm/manager";
 import { writeAliasForTool } from "@/lib/mitmAliasCache";
 
+// Hard opt-out: see the parent MITM route's flag documentation.
+const MITM_DISABLED = process.env.NINEROUTER_DISABLE_MITM === "1";
+const disabledResponse = () =>
+  Response.json({ error: "MITM disabled on this deployment (NINEROUTER_DISABLE_MITM=1)" }, { status: 503 });
+
 // GET - Get MITM aliases for a tool
 export async function GET(request) {
+  if (MITM_DISABLED) return disabledResponse();
   try {
     const { searchParams } = new URL(request.url);
     const toolName = searchParams.get("tool");
@@ -19,6 +25,7 @@ export async function GET(request) {
 
 // PUT - Save MITM aliases for a specific tool
 export async function PUT(request) {
+  if (MITM_DISABLED) return disabledResponse();
   try {
     const { tool, mappings } = await request.json();
 

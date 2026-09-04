@@ -27,6 +27,8 @@ ENV HOST=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATA_DIR=/app/data
 ENV DASHBOARD_EXPORT_DIR=/app/out
+# Containers never use the Antigravity MITM (sudo/DNS/hosts edits) — hard-off.
+ENV NINEROUTER_DISABLE_MITM=1
 
 # Production deps only — Next.js/React are devDependencies now, not installed here.
 # better-sqlite3 ships per-platform prebuilds; if a download ever fails, the app

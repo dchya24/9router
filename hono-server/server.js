@@ -15,6 +15,9 @@
 //   - 128mb proxyClientMaxBodySize (Hono imposes no body limit)
 //
 // Env: PORT (default 20127), HOST (default 0.0.0.0), DATA_DIR.
+// NINEROUTER_DISABLE_MITM=1: never auto-start the Antigravity MITM process,
+// skip DNS restores/cleanup, and make the /api/cli-tools/antigravity-mitm*
+// endpoints answer 503. Recommended for container deployments.
 
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";

@@ -13,6 +13,12 @@ import {
 } from "@/mitm/manager";
 import { getSettings, updateSettings } from "@/lib/localDb";
 
+// Hard opt-out: the whole MITM surface (and its sudo/DNS/cert side effects) is
+// disabled when NINEROUTER_DISABLE_MITM=1 — endpoints answer 503 instead.
+export const MITM_DISABLED = process.env.NINEROUTER_DISABLE_MITM === "1";
+const disabledResponse = () =>
+  Response.json({ error: "MITM disabled on this deployment (NINEROUTER_DISABLE_MITM=1)" }, { status: 503 });
+
 initDbHooks(getSettings, updateSettings);
 
 const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20128";
@@ -65,6 +71,7 @@ function checkPrivilege(pwd) {
 
 // GET - Full MITM status (server + per-tool DNS)
 export async function GET() {
+  if (MITM_DISABLED) return disabledResponse();
   try {
     const status = await getMitmStatus();
     const settings = await getSettings();
@@ -91,6 +98,7 @@ export async function GET() {
 
 // POST - Start MITM server (cert + server, no DNS)
 export async function POST(request) {
+  if (MITM_DISABLED) return disabledResponse();
   try {
     const { apiKey, sudoPassword, mitmRouterBaseUrl, forceKillPort443 } = await request.json();
     const pwd = getPassword(sudoPassword) || await loadEncryptedPassword() || "";
@@ -139,6 +147,7 @@ export async function POST(request) {
 
 // DELETE - Stop MITM server (removes all DNS first, then kills server)
 export async function DELETE(request) {
+  if (MITM_DISABLED) return disabledResponse();
   try {
     const body = await request.json().catch(() => ({}));
     const { sudoPassword } = body;
@@ -160,6 +169,7 @@ export async function DELETE(request) {
 
 // PATCH - Toggle DNS for a specific tool (enable/disable)
 export async function PATCH(request) {
+  if (MITM_DISABLED) return disabledResponse();
   try {
     const { tool, action, sudoPassword } = await request.json();
     const pwd = getPassword(sudoPassword) || await loadEncryptedPassword() || "";

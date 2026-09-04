@@ -32,6 +32,11 @@ import { killAllBridges } from "@/lib/mcp/stdioSseBridge";
 
 process.setMaxListeners(20);
 
+// Hard opt-out for deployments that never use the Antigravity MITM or the
+// tunnel watchdogs (e.g. the Hono single-process container). Skips MITM
+// auto-start, DNS restores/cleanup, and spawns nothing at boot.
+export const MITM_DISABLED = process.env.NINEROUTER_DISABLE_MITM === "1";
+
 // Defer heavy startup work so the first HTTP request (login → dashboard) isn't
 // starved by DB cleanup, cloudflared download, lsof/DNS probes and OAuth pings.
 const STARTUP_DEFER_MS = 3000;
@@ -55,14 +60,16 @@ export async function initializeApp() {
     // unexpected cloudflared exits are handled even during the deferred window.
     if (!g.signalHandlersRegistered) {
       const cleanup = () => {
-        try { removeAllDNSEntriesSync(); } catch { /* best effort */ }
+        if (!MITM_DISABLED) {
+          try { removeAllDNSEntriesSync(); } catch { /* best effort */ }
+        }
         try { killAllBridges(); } catch { /* best effort */ }
-        killCloudflared();
+        if (!MITM_DISABLED) killCloudflared();
         process.exit();
       };
       process.on("SIGINT", cleanup);
       process.on("SIGTERM", cleanup);
-      process.on("exit", () => { try { removeAllDNSEntriesSync(); } catch { /* ignore */ } });
+      process.on("exit", () => { if (!MITM_DISABLED) { try { removeAllDNSEntriesSync(); } catch { /* ignore */ } } });
       g.signalHandlersRegistered = true;
     }
 
@@ -99,7 +106,9 @@ async function runHeavyStartup() {
 
   if (settings.tunnelEnabled) ensureCloudflared().catch(() => {});
 
-  if (settings.mitmEnabled) {
+  if (MITM_DISABLED) {
+    console.log("[InitApp] MITM disabled via NINEROUTER_DISABLE_MITM=1 — skipping auto-start and DNS sync");
+  } else if (settings.mitmEnabled) {
     // Sync mitmAlias DB → JSON cache so standalone MITM server can read it.
     syncMitmAliasCache().catch(() => {});
     autoStartMitm(settings);
@@ -146,6 +155,7 @@ async function autoStartMitm(settings) {
     await startMitm(activeKey?.key || "sk_9router", password);
     console.log("[InitApp] MITM auto-started");
     try {
+      if (MITM_DISABLED) return;
       await restoreToolDNS(password);
       console.log("[InitApp] DNS restored from saved state");
     } catch (e) {
