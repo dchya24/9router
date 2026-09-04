@@ -21,6 +21,7 @@ import { Hono } from "hono";
 import { registerGuards } from "./guard.js";
 import { runWithRequest } from "./shims/next-headers.mjs";
 import { createStaticHandler } from "./static.js";
+import { createWrappingServer } from "./peer-server.js";
 
 const PORT = Number(process.env.PORT || 20127);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -577,7 +578,7 @@ if (process.env.NINEROUTER_DISABLE_INSTRUMENTATION !== "1") {
   }
 }
 
-const server = serve({ fetch: app.fetch, port: PORT, hostname: HOST }, (info) => {
+const server = serve({ fetch: app.fetch, port: PORT, hostname: HOST, createServer: createWrappingServer }, (info) => {
   console.log(`[hono] 9Router proxy surface listening on http://${HOST}:${info.port}`);
 });
 

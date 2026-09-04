@@ -1,18 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  json: vi.fn((body, init) => ({
-    status: init?.status || 200,
-    body,
-  })),
   cookies: vi.fn(),
   getSettings: vi.fn(),
   isOidcConfigured: vi.fn(),
   getDashboardAuthSession: vi.fn(),
 }));
 
-vi.mock("next/server", () => ({
-  NextResponse: { json: mocks.json },
+vi.mock("next/headers", () => ({
+  cookies: mocks.cookies,
 }));
 
 vi.mock("next/headers", () => ({
@@ -45,8 +41,9 @@ describe("GET /api/auth/status", () => {
     mocks.getDashboardAuthSession.mockResolvedValue({ authenticated: true });
 
     const response = await GET();
+    const body = await response.json();
 
-    expect(response.body.authenticated).toBe(true);
+    expect(body.authenticated).toBe(true);
     expect(mocks.getDashboardAuthSession).toHaveBeenCalledWith("session-token");
   });
 
@@ -54,16 +51,18 @@ describe("GET /api/auth/status", () => {
     mocks.getDashboardAuthSession.mockResolvedValue(null);
 
     const response = await GET();
+    const body = await response.json();
 
-    expect(response.body.authenticated).toBe(false);
+    expect(body.authenticated).toBe(false);
   });
 
   it("fails closed when status dependencies throw", async () => {
     mocks.getSettings.mockRejectedValue(new Error("database unavailable"));
 
     const response = await GET();
+    const body = await response.json();
 
-    expect(response.body.authenticated).toBe(false);
-    expect(response.body.requireLogin).toBe(true);
+    expect(body.authenticated).toBe(false);
+    expect(body.requireLogin).toBe(true);
   });
 });

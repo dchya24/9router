@@ -110,44 +110,6 @@ function resolveStandaloneBuild(appDir, buildDistDir) {
   return { standaloneApp, standaloneRoot };
 }
 
-function copyStandaloneBuild(appDir, buildDistDir, cliAppDir) {
-  const { standaloneApp, standaloneRoot } = resolveStandaloneBuild(appDir, buildDistDir);
-  copyRecursive(standaloneApp, cliAppDir);
-
-  // Older nested-app layout stores traced node_modules at standalone root.
-  const standaloneNodeModules = path.join(standaloneRoot, "node_modules");
-  if (standaloneApp !== standaloneRoot && fs.existsSync(standaloneNodeModules)) {
-    copyRecursive(standaloneNodeModules, path.join(cliAppDir, "node_modules"));
-  }
-}
-
-function mergeServerArtifacts(buildDistDir, cliAppDir) {
-  const serverSrc = path.join(buildDistDir, "server");
-  const serverDest = path.join(cliAppDir, buildDistDirName, "server");
-  if (!fs.existsSync(serverSrc)) {
-    throw new Error(`Complete Next.js server build not found: ${serverSrc}`);
-  }
-  copyRecursive(serverSrc, serverDest);
-}
-
-function assertRequiredApiArtifacts(cliAppDir) {
-  const requiredArtifacts = [
-    "app/api/v1/chat/completions/route.js",
-    "app/api/v1/messages/route.js",
-  ];
-  const serverDir = path.join(cliAppDir, buildDistDirName, "server");
-  const missingArtifacts = requiredArtifacts
-    .map((artifact) => path.join(serverDir, artifact))
-    .filter((artifact) => !fs.existsSync(artifact));
-
-  if (missingArtifacts.length > 0) {
-    throw new Error(
-      `Required CLI API route artifact${missingArtifacts.length === 1 ? " is" : "s are"} missing:\n` +
-      missingArtifacts.join("\n"),
-    );
-  }
-}
-
 function buildCliPackage() {
   console.log("📦 Building 9Router CLI package with Next.js...\n");
 
@@ -168,10 +130,10 @@ function buildCliPackage() {
     console.log(`✅ Version already synced: ${cliPkg.version}\n`);
   }
 
-  // Step 1: Build app with Next.js (workspace tracing root → traced node_modules in standalone).
-  console.log("1️⃣  Building Next.js app...");
+  // Step 1: Build the static dashboard export.
+  console.log("1️⃣  Building static dashboard export...");
   try {
-    execSync("npm run build", {
+    execSync("npx next build --webpack", {
       stdio: "inherit",
       cwd: appDir,
       env: {
@@ -181,10 +143,9 @@ function buildCliPackage() {
         APPDATA: path.join(buildHomeDir, "AppData", "Roaming"),
         LOCALAPPDATA: path.join(buildHomeDir, "AppData", "Local"),
         NEXT_DIST_DIR: buildDistDirName,
-        NEXT_TRACING_ROOT_MODE: "workspace",
       }
     });
-    console.log("✅ Next.js build completed\n");
+    console.log("✅ Static export build completed\n");
   } catch (error) {
     console.error("❌ Next.js build failed");
     process.exit(1);
@@ -197,34 +158,22 @@ function buildCliPackage() {
   }
   console.log("✅ Cleaned\n");
 
-  // Step 3: Copy Next.js standalone build to app/cli/app.
-  // Newer Next.js standalone output writes server.js/package.json plus .next/, src/, and
-  // node_modules/ directly under .next/standalone. Older builds may still use a nested app/.
-  console.log("3️⃣  Copying Next.js standalone build to app/cli/app...");
-  try {
-    copyStandaloneBuild(appDir, buildDistDir, cliAppDir);
-  } catch (error) {
-    console.error("❌ Next.js standalone build not found under .next/standalone");
-    console.error("Expected either .next/standalone/server.js or .next/standalone/app/");
-    process.exit(1);
+  // Step 3: Copy the Hono runtime layout (no Next standalone anymore).
+  console.log("3️⃣  Copying hono-server runtime to app/cli/app...");
+  for (const dir of ["hono-server", "src", "open-sse"]) {
+    const srcDir = path.join(appDir, dir);
+    if (!fs.existsSync(srcDir)) {
+      console.error(`❌ Required runtime directory missing: ${dir}`);
+      process.exit(1);
+    }
+    copyRecursive(srcDir, path.join(cliAppDir, dir));
   }
-  console.log("✅ Copied standalone build\n");
+  // Server code paths the app resolves at runtime (peer deps of src/):
+  // keep node_modules with production deps only.
+  console.log("✅ Copied hono-server runtime\n");
 
-  // Step 3a: Copy custom server (injects real socket IP, strips spoofable XFF).
-  const customServerSrc = path.join(appDir, "custom-server.js");
-  if (fs.existsSync(customServerSrc)) {
-    fs.copyFileSync(customServerSrc, path.join(cliAppDir, "custom-server.js"));
-    console.log("✅ Copied custom-server.js\n");
-  } else {
-    console.error("❌ custom-server.js not found — without it no request can be proven local,");
-    console.error("   so the packaged CLI would demand an API key for its own dashboard and /v1.");
-    process.exit(1);
-  }
-
-  // Step 3b: Ensure sql.js (pure JS fallback) bundled in app/cli/app/node_modules.
-  // Strip better-sqlite3 (native) — it lives in ~/.9router/runtime to avoid
-  // Windows EBUSY during global CLI updates. node:sqlite (Node ≥22.5) is also
-  // available as a no-install middle tier.
+  // Step 3b: Configure SQLite drivers (unchanged policy: better-sqlite3 lives
+  // in ~/.9router/runtime, sql.js is bundled, node:sqlite/bun:sqlite built-in).
   console.log("3️⃣ b Configuring SQLite drivers...");
   function ensureModuleInBundle(pkg) {
     const dest = path.join(cliAppDir, "node_modules", pkg);
@@ -236,37 +185,30 @@ function buildCliPackage() {
       path.join(appDir, "node_modules", pkg),
       path.join(rootDir, "node_modules", pkg),
     ];
-    const src = candidates.find((p) => fs.existsSync(p));
-    if (!src) {
+    const srcM = candidates.find((p) => fs.existsSync(p));
+    if (!srcM) {
       console.warn(`⚠️  ${pkg} not found locally — bundle will rely on node:sqlite or runtime install`);
       return;
     }
     fs.mkdirSync(path.dirname(dest), { recursive: true });
-    copyRecursive(src, dest);
+    copyRecursive(srcM, dest);
     console.log(`✅ Bundled ${pkg}`);
   }
   ensureModuleInBundle("sql.js");
-  // `open` is external (see serverExternalPackages in next.config.mjs), so it must exist in
-  // the bundle's node_modules or every importer throws MODULE_NOT_FOUND at runtime. Output
-  // tracing normally copies it; this is the same belt-and-braces guard used for sql.js.
   ensureModuleInBundle("open");
-  const betterDir = path.join(cliAppDir, "node_modules", "better-sqlite3");
-  if (fs.existsSync(betterDir)) {
-    fs.rmSync(betterDir, { recursive: true, force: true });
-    console.log("✅ Stripped better-sqlite3 (lives in ~/.9router/runtime)");
-  }
   console.log("");
 
-  // Step 4: Copy static files
-  console.log("4️⃣  Copying static files...");
-  const staticSrc = path.join(appDir, ".next", "static");
-  const staticSrcResolved = path.join(buildDistDir, "static");
-  const staticDest = path.join(cliAppDir, buildDistDirName, "static");
-  if (fs.existsSync(staticSrcResolved) || fs.existsSync(staticSrc)) {
-    copyRecursive(fs.existsSync(staticSrcResolved) ? staticSrcResolved : staticSrc, staticDest);
-    console.log("✅ Copied static files\n");
+  // Step 4: Copy the static dashboard export (dist dir IS the site root).
+  console.log("4️⃣  Copying static dashboard export...");
+  const exportSrc = path.join(appDir, buildDistDirName);
+  if (fs.existsSync(path.join(exportSrc, "index.html"))) {
+    const exportDest = path.join(cliAppDir, "out");
+    if (fs.existsSync(exportDest)) fs.rmSync(exportDest, { recursive: true, force: true });
+    copyRecursive(exportSrc, exportDest);
+    console.log("✅ Copied static export\n");
   } else {
-    console.log("⏭️  No static files found\n");
+    console.error("❌ Static dashboard export not found — run `NEXT_DIST_DIR=.next-export-build npx next build --webpack` first.");
+    process.exit(1);
   }
 
   // Step 5: Copy public folder if exists
@@ -280,24 +222,14 @@ function buildCliPackage() {
     console.log("⏭️  No public folder found\n");
   }
 
-  // Step 6: Copy vendor-chunks (required for production)
-  console.log("6️⃣  Copying vendor-chunks...");
-  const vendorChunksSrc = path.join(appDir, ".next", "server", "vendor-chunks");
-  const vendorChunksSrcResolved = path.join(buildDistDir, "server", "vendor-chunks");
-  const vendorChunksDest = path.join(cliAppDir, buildDistDirName, "server", "vendor-chunks");
-  if (fs.existsSync(vendorChunksSrcResolved) || fs.existsSync(vendorChunksSrc)) {
-    copyRecursive(fs.existsSync(vendorChunksSrcResolved) ? vendorChunksSrcResolved : vendorChunksSrc, vendorChunksDest);
-    console.log("✅ Copied vendor-chunks\n");
-  } else {
-    console.log("⏭️  No vendor-chunks found\n");
-  }
-
-  // Step 6b: Merge the complete generated server tree. Next.js standalone output
-  // is trace-pruned and can omit route modules or chunks loaded dynamically.
-  console.log("6️⃣ b Copying complete server artifacts...");
-  mergeServerArtifacts(buildDistDir, cliAppDir);
-  assertRequiredApiArtifacts(cliAppDir);
-  console.log("✅ Copied complete server artifacts\n");
+  // Step 6: production package.json so the bundle can npm-install missing
+  // runtime deps on first boot (same self-heal as before).
+  fs.writeFileSync(path.join(cliAppDir, "package.json"), JSON.stringify({
+    name: "9router-bundle",
+    version: cliPkg.version,
+    private: true,
+  }, null, 2));
+  console.log("✅ Wrote bundle package.json\n");
 
   // Step 7: Copy MITM server files (not bundled by Next.js standalone)
   console.log("7️⃣  Copying MITM server files...");
@@ -343,11 +275,7 @@ function buildCliPackage() {
   }
 }
 
-module.exports = {
-  assertRequiredApiArtifacts,
-  copyStandaloneBuild,
-  mergeServerArtifacts,
-};
+module.exports = {};
 
 if (require.main === module) {
   buildCliPackage();

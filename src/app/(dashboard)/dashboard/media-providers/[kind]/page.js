@@ -2,10 +2,9 @@ import KindClient from "./KindClient";
 
 // Static export wrapper — enumerates params at build time; Hono serves this
 // shell for any param value at runtime (the client hydrates from the URL).
-import { MEDIA_PROVIDER_KINDS } from "@/shared/constants/providers";
-
+// Client component — one shell placeholder; Hono serves it for any kind.
 export function generateStaticParams() {
-  return MEDIA_PROVIDER_KINDS.map((k) => ({ kind: k.id }));
+  return [{ kind: "shell" }];
 }
 export default function Page() {
   return <KindClient />;

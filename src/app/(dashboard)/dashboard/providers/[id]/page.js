@@ -2,10 +2,9 @@ import ProviderDetailClient from "./ProviderDetailClient";
 
 // Static export wrapper — enumerates params at build time; Hono serves this
 // shell for any param value at runtime (the client hydrates from the URL).
-import { AI_PROVIDERS } from "@/shared/constants/providers";
-
+// Client component — one shell placeholder; Hono serves it for any id.
 export function generateStaticParams() {
-  return Object.keys(AI_PROVIDERS).map((id) => ({ id }));
+  return [{ id: "shell" }];
 }
 export default function Page() {
   return <ProviderDetailClient />;

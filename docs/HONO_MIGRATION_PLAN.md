@@ -1,11 +1,8 @@
 # Hono Migration Plan — Proxy API on bare Node
 
-_Status: **Phase 3 complete; Phase 4 dashboard-static working (2026-09-04)** —
-every route lives in Hono, and the dashboard now builds as a static export
-served by Hono itself. A pure-Hono process (`node --import
-./hono-server/register.mjs hono-server/server.js`, no Next) serves guard,
-APIs, proxy surface, and dashboard E2E. Remaining: production packaging
-(Dockerfile, CLI, start scripts) — see Phase 4 below._
+_Status: **Phase 4 complete (2026-09-04)** — single-process Hono deployment,
+Docker image rebuilt and E2E-verified. Remaining (optional): merge branch,
+CLI smoke test on real hardware, multi-user auth feature._
 
 ## Goal
 
@@ -208,11 +205,37 @@ Done:
   `/api/keys` still 401. Bench unchanged: ~89–97 MB.
 
 Remaining:
-- Production packaging: Dockerfile (build static + run hono-server; drop
-  standalone copy steps), `cli/` launcher (spawns hono-server instead of
-  custom-server), `start.sh`/npm scripts, `cli-build-artifacts` test fixtures.
-- Post-cleanup: delete `custom-server.js`, `scripts/copy-standalone-assets.mjs`,
-  and the front-proxy code path once confident.
+- ~~Production packaging~~ **done** (see below).
+- ~~Post-cleanup~~ **done**: `custom-server.js` and
+  `scripts/copy-standalone-assets.mjs` deleted.
+
+### ✅ Phase 4 — Packaging (Docker + CLI + custom-server removal)
+
+- **Dependencies reclassified**: Next/React and all UI-only packages moved to
+  `devDependencies` — the runtime installs hono, jose, undici,
+  better-sqlite3, sql.js, etc. only (81 MB node_modules in image vs full).
+- **`hono-server/peer-server.js`**: 1:1 port of `custom-server.js` (TCP-socket
+  IP stamping, forwarding-header stripping, peer token, h2c downgrade) wired
+  via `serve({ createServer })`. `custom-server.js` **deleted**; its security
+  test rewritten against the new module (`tests/unit/peer-server-headers.test.js`).
+- **`Dockerfile` rebuilt**: multi-stage — builder installs all deps and runs
+  the static export; runner copies production deps + source + export
+  (`COPY --from=builder`). No Next standalone, no build tools in runner.
+  **522 MB (119 MB content) vs prior ~1.1 GB standalone image.**
+- **Over-prerendering fix**: dynamic pages export a single placeholder shell
+  (client components hydrate from the URL; Hono's static handler serves the
+  shell for any param) — export shrank 78 MB → 13 MB (3.2k pages → ~40).
+- **`cli/scripts/build-cli.js`** rewritten: bundles `hono-server/` + `src/` +
+  `open-sse/` + the static export instead of the Next standalone; the CLI
+  launcher (`cli/cli.js`) spawns hono-server via `--import register.mjs`.
+- **Container E2E verified**: healthz, login page, authed dashboard +
+  deep-links + provider pages, `/api/providers`, `/api/usage/stats` 200;
+  unauthed `/api/keys` 401; remote `/v1/models` without key 401.
+- Tests: `cli-build-artifacts.test.js` rewritten for the new bundle layout;
+  `auth-status.test.js` updated off the deleted `next/server` mock;
+  `custom-server-h2c`/`standalone-assets` tests removed with their subjects.
+  All other failures in the suite pre-date the migration (verified via git
+  stash baseline run).
 
 ### Phase 4 — Auth + decommission Next
 - Migrate auth group (login/logout/status, SAML, OIDC). These use

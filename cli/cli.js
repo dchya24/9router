@@ -524,17 +524,15 @@ function openBrowser(url) {
   });
 }
 
-// Find standalone server (bundled in bin/app for published package).
-// Prefer custom-server.js (injects real socket IP) when present.
+// Find the Hono server entry (bundled in bin/app for published package).
+// Peer-header stamping and h2c downgrade live in hono-server/peer-server.js.
 const standaloneDir = path.join(__dirname, "app");
-const customServerPath = path.join(standaloneDir, "custom-server.js");
-const serverPath = fs.existsSync(customServerPath)
-  ? customServerPath
-  : path.join(standaloneDir, "server.js");
+const registerPath = path.join(standaloneDir, "hono-server", "register.mjs");
+const serverPath = path.join(standaloneDir, "hono-server", "server.js");
 
-if (!fs.existsSync(serverPath)) {
-  console.error("Error: Standalone build not found.");
-  console.error("Please run 'npm run build:cli' first.");
+if (!fs.existsSync(serverPath) || !fs.existsSync(registerPath)) {
+  console.error("Error: hono-server bundle not found.");
+  console.error("Please run 'npm run cli:pack' first.");
   process.exit(1);
 }
 
@@ -612,7 +610,7 @@ function startServer(updatePromise) {
   function spawnServer() {
     serverStartTime = Date.now();
     crashLog = [];
-    const child = spawn(RUNTIME, ["--dns-result-order=ipv4first", "--max-old-space-size=6144", serverPath], {
+    const child = spawn(RUNTIME, ["--dns-result-order=ipv4first", "--max-old-space-size=6144", "--import", registerPath, serverPath], {
       cwd: standaloneDir,
       stdio: showLog ? "inherit" : ["ignore", "ignore", "pipe"],
       detached: true,

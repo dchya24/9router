@@ -1,20 +1,21 @@
 # syntax=docker/dockerfile:1.7
 ARG NODE_IMAGE=node:22-alpine
-FROM ${NODE_IMAGE} AS base
+
+# ── Builder: full deps (Next + React are devDependencies) → static export ──
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 
-FROM base AS builder
-
-RUN apk --no-cache upgrade && apk --no-cache add python3 make g++ linux-headers
-
-COPY package.json ./
+COPY package.json bun.lock ./
 RUN --mount=type=cache,target=/root/.npm \
   npm install
 
 COPY . ./
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# Static dashboard export (next.config.mjs output:"export") → .next-export-build/
+# (Next 16 writes the export into distDir, so the dist dir IS the site root)
+RUN NEXT_DIST_DIR=.next-export-build npx next build --webpack
 
+# ── Runner: production deps only (hono, jose, undici, better-sqlite3, …) ───
 FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 
@@ -22,37 +23,37 @@ LABEL org.opencontainers.image.title="9router"
 
 ENV NODE_ENV=production
 ENV PORT=20128
-ENV HOSTNAME=0.0.0.0
+ENV HOST=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATA_DIR=/app/data
+ENV DASHBOARD_EXPORT_DIR=/app/out
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/custom-server.js ./custom-server.js
-COPY --from=builder /app/open-sse ./open-sse
-# Next file tracing can omit sibling files; MITM runs server.js as a separate process.
-COPY --from=builder /app/src/mitm ./src/mitm
-# Standalone node_modules may omit deps only required by the MITM child process.
-COPY --from=builder /app/node_modules/node-forge ./node_modules/node-forge
-# Ensure `next` is available at runtime in case tracing did not include it.
-COPY --from=builder /app/node_modules/next ./node_modules/next
-# sql.js loads dist/sql-wasm.wasm by path at runtime; tracing only follows JS imports,
-# so the last-resort DB driver would abort with ENOENT on the missing binary.
-COPY --from=builder /app/node_modules/sql.js ./node_modules/sql.js
-# node-machine-id is createRequire-loaded at runtime; tracing omits it.
-COPY --from=builder /app/node_modules/node-machine-id ./node_modules/node-machine-id
+# Production deps only — Next.js/React are devDependencies now, not installed here.
+# better-sqlite3 ships per-platform prebuilds; if a download ever fails, the app
+# falls back to node:sqlite (built into Node ≥22.5) via src/lib/db/driver.js.
+COPY package.json ./
+RUN --mount=type=cache,target=/root/.npm \
+  npm install --omit=dev --no-audit --no-fund
 
-RUN mkdir -p /app/data && chown -R node:node /app && \
-  mkdir -p /app/data-home && chown node:node /app/data-home && \
-  ln -sf /app/data-home /root/.9router 2>/dev/null || true
+# Server source (routes, sse core, lib, shared) + hono-server + exported dashboard
+COPY hono-server ./hono-server
+COPY src ./src
+COPY open-sse ./open-sse
+COPY --from=builder /app/.next-export-build ./out
+COPY public ./public
+# sql.js loads dist/sql-wasm.wasm by path at runtime (last-resort DB driver);
+# node-machine-id is createRequire-loaded — both come from npm install above.
+
+RUN mkdir -p /app/data && chown -R node:node /app
 
 # Fix permissions at runtime (handles mounted volumes)
 RUN apk --no-cache upgrade && apk --no-cache add su-exec && \
-  printf '#!/bin/sh\nchown -R node:node /app/data /app/data-home 2>/dev/null\nexec su-exec node "$@"\n' > /entrypoint.sh && \
+  printf '#!/bin/sh\nchown -R node:node /app/data 2>/dev/null\nexec su-exec node "$@"\n' > /entrypoint.sh && \
   chmod +x /entrypoint.sh
 
 EXPOSE 20128
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["node", "custom-server.js"]
+# Peer-header stamping + h2c downgrade live in hono-server/peer-server.js
+# (custom-server.js parity).
+CMD ["node", "--import", "./hono-server/register.mjs", "hono-server/server.js"]

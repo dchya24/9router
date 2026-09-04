@@ -1,38 +1,37 @@
-// custom-server.js is the only thing that makes x-9r-real-ip trustworthy. Boot a real
-// HTTP server through it and confirm a client cannot smuggle its own peer headers in.
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createRequire } from "node:module";
+// peer-server.js (the hono-server port of custom-server.js) is the only thing
+// that makes x-9r-real-ip trustworthy. Boot a real HTTP server through it and
+// confirm a client cannot smuggle its own peer headers in.
+import { describe, it, expect, afterAll } from "vitest";
 import http from "node:http";
+import { createRequire } from "node:module";
+import { createWrappingServer, ensurePeerToken } from "../../hono-server/peer-server.js";
 import { __test__ as requestDetails } from "@/lib/db/repos/requestDetailsRepo.js";
 
 const require = createRequire(import.meta.url);
 
-let server;
-let baseUrl;
 let seenHeaders;
-
-beforeAll(async () => {
-  require("../../custom-server.js");
-  server = http.createServer((req, res) => {
-    seenHeaders = req.headers;
-    res.end("ok");
-  });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+const server = createWrappingServer({}, (req, res) => {
+  seenHeaders = req.headers;
+  res.end("ok");
 });
-
 afterAll(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
 async function get(headers = {}) {
-  await fetch(baseUrl, { headers });
-  return seenHeaders;
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  try {
+    await fetch(`http://127.0.0.1:${port}`, { headers });
+    return seenHeaders;
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 }
 
-describe("custom-server peer header sanitizing", () => {
+describe("peer-server peer header sanitizing", () => {
   it("generates a peer trust token at boot", () => {
-    expect(process.env.NINEROUTER_PEER_TOKEN).toMatch(/^[0-9a-f]{48}$/);
+    expect(ensurePeerToken()).toMatch(/^[0-9a-f]{48}$/);
   });
 
   it("replaces a client-supplied x-9r-real-ip with the socket address", async () => {
