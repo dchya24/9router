@@ -536,7 +536,7 @@ if (NEXT_UPSTREAM) {
     }
   });
 } else {
-  const exportDir = process.env.DASHBOARD_EXPORT_DIR || ".next-export-build";
+  const exportDir = process.env.DASHBOARD_EXPORT_DIR || "out";
   const staticHandler = createStaticHandler(exportDir);
   if (staticHandler) {
     app.notFound(staticHandler);

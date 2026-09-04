@@ -1,6 +1,13 @@
 # Docker
 
-Run 9Router in a container. Published image: [`decolua/9router`](https://hub.docker.com/r/decolua/9router) — multi-platform `linux/amd64` + `linux/arm64`.
+Run 9Router in a container. This fork builds a **single-process Hono image** —
+one small Node process serves the dashboard (static export), all APIs, the
+LLM proxy surface, and the security guard. There is no Next.js server process
+and the Antigravity MITM is disabled by default (`NINEROUTER_DISABLE_MITM=1`).
+
+- Upstream image (unchanged behavior): [`decolua/9router`](https://hub.docker.com/r/decolua/9router)
+- This fork: build locally (below) or point CI at this repo — the image
+  layout and ports are identical, so the commands work for either.
 
 ---
 
@@ -14,10 +21,33 @@ docker run -d \
   -v "$HOME/.9router:/app/data" \
   -e DATA_DIR=/app/data \
   --name 9router \
-  decolua/9router:latest
+  9router:hono-test
 ```
 
+> Use `decolua/9router:latest` here instead if you want the upstream image.
+> `9router:hono-test` is the tag the local build in this repo produces.
+
 App listens on port `20128`. Open: http://localhost:20128
+
+First boot initializes an empty SQLite DB in the mounted data dir. The
+dashboard asks you to set a password on first login (or set
+`INITIAL_PASSWORD` before first launch).
+
+## Docker Compose
+
+```yaml
+services:
+  9router:
+    build: .            # or image: <your-registry>/9router:latest
+    ports:
+      - "20128:20128"
+    volumes:
+      - "$HOME/.9router:/app/data"
+    environment:
+      DATA_DIR: /app/data
+      # INITIAL_PASSWORD: change-me-before-first-login
+    restart: unless-stopped
+```
 
 ## Manage container
 
@@ -35,7 +65,9 @@ docker rm -f 9router          # remove
 -e DATA_DIR=/app/data
 ```
 
-Without `DATA_DIR`, the app falls back to `~/.9router/` (macOS/Linux) or `%APPDATA%\9router\` (Windows). In the container, `DATA_DIR=/app/data` makes the bind mount work.
+Without `DATA_DIR`, the app falls back to `~/.9router/` (macOS/Linux) or
+`%APPDATA%\9router\` (Windows). In the container, `DATA_DIR=/app/data` makes
+the bind mount work.
 
 Data layout under `$DATA_DIR/`:
 
@@ -44,6 +76,7 @@ $DATA_DIR/
 ├── db/
 │   ├── data.sqlite       # main SQLite database
 │   └── backups/          # auto backups
+├── model-catalog.json    # synced model capabilities cache
 └── ...                   # certs, logs, runtime configs
 ```
 
@@ -52,26 +85,36 @@ Container path: `/app/data/db/data.sqlite`
 
 ## Optional env vars
 
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `DATA_DIR` | `/app/data` | keep the bind mount pointing here |
+| `PORT` | `20128` | container listen port |
+| `HOST` | `0.0.0.0` | bind all interfaces; set `127.0.0.1` for local-only |
+| `INITIAL_PASSWORD` | unset | pre-set the first dashboard password |
+| `JWT_SECRET` | generated to `$DATA_DIR/jwt-secret` | set for multi-replica sharing |
+| `REQUIRE_API_KEY` | `false` | require an API key for the `/v1` surface |
+| `NINEROUTER_DISABLE_MITM` | `1` (in image) | hard-off Antigravity MITM; remove to enable |
+| `NINEROUTER_DISABLE_BG_REFRESH` | unset | set `1` to skip OAuth token refresh scheduler |
+
 ```bash
 docker run -d \
   -p 20128:20128 \
   -v "$HOME/.9router:/app/data" \
   -e DATA_DIR=/app/data \
-  -e PORT=20128 \
-  -e HOSTNAME=0.0.0.0 \
-  -e DEBUG=true \
+  -e INITIAL_PASSWORD=change-me \
   --name 9router \
-  decolua/9router:latest
+  9router:hono-test
 ```
 
 ## Optional Headroom sidecar
 
-The 9Router image does not bundle Python or Headroom. To use Headroom in Docker, run it as a separate service and point 9Router at that proxy:
+The 9Router image does not bundle Python or Headroom. To use Headroom in
+Docker, run it as a separate service and point 9Router at that proxy:
 
 ```yaml
 services:
   9router:
-    image: decolua/9router:latest
+    build: .
     ports:
       - "20128:20128"
     volumes:
@@ -88,14 +131,20 @@ services:
       - "8787:8787"
 ```
 
-In the dashboard, open `Endpoint` → `Token Saver` → `Headroom`, confirm the URL is `http://headroom:8787`, recheck status, then enable Headroom.
+In the dashboard, open `Endpoint` → `Token Saver` → `Headroom`, confirm the
+URL is `http://headroom:8787`, recheck status, then enable Headroom.
 
-If Headroom runs on the Docker host instead of as a sidecar, use `http://host.docker.internal:8787` on macOS/Windows. On Linux, add `--add-host=host.docker.internal:host-gateway` or the equivalent compose `extra_hosts` entry.
+If Headroom runs on the Docker host instead of as a sidecar, use
+`http://host.docker.internal:8787` on macOS/Windows. On Linux, add
+`--add-host=host.docker.internal:host-gateway` or the equivalent compose
+`extra_hosts` entry.
 
 ## Update to latest
 
 ```bash
-docker pull decolua/9router:latest
+docker pull decolua/9router:latest   # upstream image
+# or rebuild the local image:
+docker build -t 9router:hono-test .
 docker rm -f 9router
 # re-run the quick start command
 ```
@@ -104,29 +153,57 @@ docker rm -f 9router
 
 # 🛠 For Developers
 
-## Build image locally (test)
+## Build image locally
 
 ```bash
-cd app && docker build -t 9router .
+docker build -t 9router:hono-test .
 
 docker run --rm -p 20128:20128 \
   -v "$HOME/.9router:/app/data" \
   -e DATA_DIR=/app/data \
-  9router
+  9router:hono-test
 ```
+
+Image anatomy (multi-stage):
+
+- **builder** — installs all deps (Next/React are devDependencies) and runs
+  the static dashboard export
+- **runner** — production deps only (`hono`, `jose`, `undici`,
+  `better-sqlite3`, `sql.js`, …) + `hono-server/`, `src/`, `open-sse/`, and
+  the exported dashboard. No Next.js server, no build tools.
+
+Runtime entry: `node --import ./hono-server/register.mjs hono-server/server.js`
+(the `--import` loader resolves the `@/` and `open-sse` aliases and shims
+`next/headers` for the migrated auth routes).
+
+## What the process does at boot
+
+1. Peer-header stamping + h2c downgrade wrap the HTTP server
+   (`hono-server/peer-server.js`, parity with the old custom-server.js).
+2. Deny-by-default auth guard (`hono-server/guard.js`) — public allow-list,
+   JWT session cookie, CLI token, API-key gate on `/v1`.
+3. Background OAuth token refresh scheduler (disable with
+   `NINEROUTER_DISABLE_BG_REFRESH=1`).
+4. Model-catalog sync from models.dev (disable with
+   `NINEROUTER_DISABLE_INSTRUMENTATION=1`).
+5. No MITM, no tunnel watchdogs, no DNS edits (`NINEROUTER_DISABLE_MITM=1`).
+
+## Run without Docker (source)
+
+```bash
+npm install
+npm run build                          # static dashboard export → out/
+NINEROUTER_DISABLE_MITM=1 PORT=20128 npm start              # hono-server
+```
+
+`npm start` runs the Hono server only; `npm run dev` still runs the Next dev
+server for dashboard development.
 
 ## Publish (automatic via CI)
 
-Push a git tag `v*` → GitHub Actions builds multi-platform (amd64+arm64) and pushes to:
-- `ghcr.io/decolua/9router:v{version}` + `:latest`
-- `decolua/9router:v{version}` + `:latest`
+Push a git tag `v*` → GitHub Actions builds multi-platform (amd64+arm64) and
+pushes to the registry configured in `.github/workflows/docker-publish.yml`.
 
 ```bash
-# Use scripts/release.js (recommended)
-node scripts/release.js "Release title" "Notes"
-
-# Or manually
-git tag v0.4.x && git push origin v0.4.x
+git tag v0.5.65-hono.1 && git push origin v0.5.65-hono.1
 ```
-
-Workflow: `app/.github/workflows/docker-publish.yml`

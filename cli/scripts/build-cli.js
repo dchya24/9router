@@ -200,14 +200,14 @@ function buildCliPackage() {
 
   // Step 4: Copy the static dashboard export (dist dir IS the site root).
   console.log("4️⃣  Copying static dashboard export...");
-  const exportSrc = path.join(appDir, buildDistDirName);
+  const exportSrc = path.join(appDir, "out");
   if (fs.existsSync(path.join(exportSrc, "index.html"))) {
     const exportDest = path.join(cliAppDir, "out");
     if (fs.existsSync(exportDest)) fs.rmSync(exportDest, { recursive: true, force: true });
     copyRecursive(exportSrc, exportDest);
     console.log("✅ Copied static export\n");
   } else {
-    console.error("❌ Static dashboard export not found — run `NEXT_DIST_DIR=.next-export-build npx next build --webpack` first.");
+    console.error("❌ Static dashboard export not found — run `npm run build` first.");
     process.exit(1);
   }
 

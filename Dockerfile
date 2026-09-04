@@ -11,9 +11,8 @@ RUN --mount=type=cache,target=/root/.npm \
 
 COPY . ./
 ENV NEXT_TELEMETRY_DISABLED=1
-# Static dashboard export (next.config.mjs output:"export") → .next-export-build/
-# (Next 16 writes the export into distDir, so the dist dir IS the site root)
-RUN NEXT_DIST_DIR=.next-export-build npx next build --webpack
+# Static dashboard export (next.config.mjs output:"export") → out/
+RUN npx next build --webpack
 
 # ── Runner: production deps only (hono, jose, undici, better-sqlite3, …) ───
 FROM ${NODE_IMAGE} AS runner
@@ -41,7 +40,7 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY hono-server ./hono-server
 COPY src ./src
 COPY open-sse ./open-sse
-COPY --from=builder /app/.next-export-build ./out
+COPY --from=builder /app/out ./out
 COPY public ./public
 # sql.js loads dist/sql-wasm.wasm by path at runtime (last-resort DB driver);
 # node-machine-id is createRequire-loaded — both come from npm install above.

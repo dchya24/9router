@@ -101,18 +101,26 @@ Claude Code/Codex/OpenClaw/Cursor/Cline Settings:
 
 This repository package is private (`9router-app`), so source/Docker execution is the expected local development path.
 
+Development (dashboard hot-reload):
+
 ```bash
 cp .env.example .env
 npm install
-PORT=20128 NEXT_PUBLIC_BASE_URL=http://localhost:20128 npm run dev
+PORT=20127 NEXT_PUBLIC_BASE_URL=http://localhost:20127 npm run dev
 ```
 
-Production mode:
+Production (single small Node process — no Next.js server in memory):
 
 ```bash
-npm run build
-PORT=20128 HOSTNAME=0.0.0.0 NEXT_PUBLIC_BASE_URL=http://localhost:20128 npm run start
+npm install
+npm run build                 # builds the static dashboard export
+NINEROUTER_DISABLE_MITM=1 PORT=20128 npm start
 ```
+
+> `npm start` runs the Hono server: dashboard (static), all admin APIs, and
+> the `/v1` proxy surface in one process. Set `NINEROUTER_DISABLE_MITM=0` if
+> you need the Antigravity MITM feature. See [DOCKER.md](DOCKER.md) for all
+> runtime environment variables.
 
 Default URLs:
 
