@@ -1,9 +1,8 @@
-import { NextResponse } from "next/server";
 import { killAppProcesses, spawnUpdaterAndExit } from "@/lib/appUpdater";
 
 export async function POST() {
   if (process.env.NODE_ENV !== "production") {
-    return NextResponse.json(
+    return Response.json(
       { success: false, message: "Update is only available in production build (9router CLI)" },
       { status: 403 }
     );
@@ -17,5 +16,5 @@ export async function POST() {
   // Schedule detached updater then exit current server process
   spawnUpdaterAndExit();
 
-  return NextResponse.json({ success: true, message: "Updater started. This app will exit shortly." });
+  return Response.json({ success: true, message: "Updater started. This app will exit shortly." });
 }

@@ -1,28 +1,27 @@
-import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
 import { LOCALE_COOKIE, normalizeLocale, isSupportedLocale } from "@/i18n/config";
 
 export async function POST(request) {
   try {
     const { locale } = await request.json();
-    
+
     if (!locale || !isSupportedLocale(locale)) {
-      return NextResponse.json(
+      return Response.json(
         { error: "Invalid locale" },
         { status: 400 }
       );
     }
 
     const normalized = normalizeLocale(locale);
-    const cookieStore = await cookies();
-    cookieStore.set(LOCALE_COOKIE, normalized, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365, // 1 year
+    // Same attributes Next's cookies().set() emitted for this route:
+    // name=value; Path=/; Expires=<+1yr>; Max-Age=<1yr>, no others.
+    const maxAge = 60 * 60 * 24 * 365;
+    return Response.json({ success: true, locale: normalized }, {
+      headers: {
+        "Set-Cookie": `${LOCALE_COOKIE}=${normalized}; Path=/; Expires=${new Date(Date.now() + maxAge * 1000).toUTCString()}; Max-Age=${maxAge}`,
+      },
     });
-
-    return NextResponse.json({ success: true, locale: normalized });
   } catch (error) {
-    return NextResponse.json(
+    return Response.json(
       { error: "Failed to set locale" },
       { status: 500 }
     );

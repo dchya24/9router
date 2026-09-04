@@ -50,6 +50,13 @@ const apiKeys = loaderFor("keys");
 const apiCombos = loaderFor("combos");
 const apiPools = loaderFor("proxy-pools");
 const apiSettings = loaderFor("settings");
+const apiVersion = loaderFor("version");
+const apiPricing = loaderFor("pricing");
+const apiTags = loaderFor("tags");
+const apiInit = loaderFor("init");
+const apiHealth = loaderFor("health");
+const apiTranslator = loaderFor("translator");
+const apiMcp = loaderFor("mcp");
 
 // Adapts a Next route handler to a Hono handler.
 // opts.catchAll: param name receiving path segments after catchAllPrefix.
@@ -269,6 +276,34 @@ const SETTINGS_ROUTES = [
 ];
 register("/api", SETTINGS_ROUTES);
 
+// ─── Admin batch: version, pricing, tags, init, health, translator, mcp ────
+register("/api", [
+  ["GET", "/version", () => apiVersion("/route.js")],
+  // version/shutdown + version/update: registered but never called in tests
+  // (destructive — they stop/update the host process).
+  ["POST", "/version/shutdown", () => apiVersion("/shutdown/route.js")],
+  ["POST", "/version/update", () => apiVersion("/update/route.js")],
+  ["GET", "/pricing", () => apiPricing("/route.js")],
+  ["PATCH", "/pricing", () => apiPricing("/route.js")],
+  ["DELETE", "/pricing", () => apiPricing("/route.js")],
+  ["OPTIONS", "/tags", () => apiTags("/route.js")],
+  ["GET", "/tags", () => apiTags("/route.js")],
+  ["GET", "/init", () => apiInit("/route.js")],
+  ["OPTIONS", "/health", () => apiHealth("/route.js")],
+  ["GET", "/health", () => apiHealth("/route.js")],
+  ["POST", "/locale", () => loaderFor("locale")("/route.js")],
+  ["GET", "/translator/console-logs", () => apiTranslator("/console-logs/route.js")],
+  ["DELETE", "/translator/console-logs", () => apiTranslator("/console-logs/route.js")],
+  ["GET", "/translator/console-logs/stream", () => apiTranslator("/console-logs/stream/route.js")],
+  ["GET", "/translator/load", () => apiTranslator("/load/route.js")],
+  ["POST", "/translator/save", () => apiTranslator("/save/route.js")],
+  ["POST", "/translator/send", () => apiTranslator("/send/route.js")],
+  ["POST", "/translator/translate", () => apiTranslator("/translate/route.js")],
+  // /api/mcp is LOCAL_ONLY (guard) — MCP server SSE + message endpoints
+  ["GET", "/mcp/:plugin/sse", () => apiMcp("/[plugin]/sse/route.js"), { id: "plugin" }],
+  ["POST", "/mcp/:plugin/message", () => apiMcp("/[plugin]/message/route.js"), { id: "plugin" }],
+]);
+
 // ─── Remaining Next rewrites, via internal re-dispatch ──────────────────────
 async function redispatch(c, newPath) {
   const url = new URL(c.req.url);
@@ -351,8 +386,31 @@ if (process.env.NINEROUTER_DISABLE_BG_REFRESH !== "1") {
   }
 }
 
+// ─── Instrumentation parity (src/instrumentation.js register()) ─────────────
+// Console-log capture feeds /api/translator/console-logs; the catalog override
+// + sync back open-sse capabilities used by /v1/models.
+if (process.env.NINEROUTER_DISABLE_INSTRUMENTATION !== "1") {
+  try {
+    const { initConsoleLogCapture } = await import("@/lib/consoleLogBuffer");
+    initConsoleLogCapture();
+    const { installCatalogSource } = await import("open-sse/providers/catalogOverride.js");
+    await installCatalogSource();
+    const { startModelCatalogSync } = await import("@/lib/modelCatalog/sync.js");
+    startModelCatalogSync();
+  } catch (e) {
+    console.error("[hono] instrumentation init failed:", e?.message || e);
+  }
+}
+
 const server = serve({ fetch: app.fetch, port: PORT, hostname: HOST }, (info) => {
   console.log(`[hono] 9Router proxy surface listening on http://${HOST}:${info.port}`);
+});
+
+// A long-running local proxy must not die on one bad request. Log loudly; the
+// default Node behavior (crash on unhandled rejection) killed the process when
+// a lazy module load failed mid-request.
+process.on("unhandledRejection", (reason) => {
+  console.error("[hono] unhandled rejection:", reason?.stack || reason);
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {

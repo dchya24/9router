@@ -131,14 +131,34 @@ private port, with undici's stale `content-encoding`/`content-length` headers
 stripped. Next's own middleware re-validates proxied requests.
 
 **Groups migrated — `usage` (10), `providers` (10), `models` (7), `keys` (2),
-`combos` (2), `proxy-pools` (6), `settings` (4) = 41 admin routes.**
+`combos` (2), `proxy-pools` (6), `settings` (4), `version` (3), `pricing` (1),
+`tags` (1), `init` (1), `health` (1), `locale` (1), `translator` (6),
+`mcp` (2) = 56 admin routes.**
 Codemod `NextResponse.json(` → `Response.json(` + drop the `next/server`
-import, register in the route table (incl. dynamic `[id]`/`[connectionId]`
-routes and the EventEmitter-based `/usage/stream` SSE). Verified through the
-Hono front against a production-backup import: all migrated GET endpoints
+import, register in the route table (incl. dynamic `[id]`/`[connectionId]`/
+`[plugin]` routes, the EventEmitter-based `/usage/stream` SSE, and the ported
+`/locale` route — its `next/headers` cookie write became a plain `Set-Cookie`
+header, byte-identical to what Next emitted). Verified through the Hono front
+against a production-backup import: all migrated GET endpoints
 **byte-identical** to Next direct (incl. dynamic `:id` routes), and full
 write-path round-trips through the shared DB (models/disabled, api keys —
 create via Hono → visible to Next → delete via Hono → clean).
+
+**Instrumentation port — done, with a Next bug found.** `register()` from
+`src/instrumentation.js` now runs in the Hono server (console-log capture,
+catalog override install, model-catalog sync). The parity check then exposed
+that the Next standalone build **never runs its instrumentation**:
+`/api/models/catalog-sync` reports `lastSync: null` on Next while Hono syncs
+correctly — so Hono's model caps are refined by the models.dev catalog while
+Next standalone serves unrefined static-table caps. Pre-existing Next bug;
+the end-state Hono deployment is strictly better here.
+
+**Hardening found during testing:**
+- CJS files under `src/` can `require("@/…")` (e.g. `stdioSseBridge.js`) —
+  ESM loader hooks don't see those, so `register.mjs` also patches
+  `Module._resolveFilename` with the same alias mapping.
+- An unhandled rejection (failed lazy module load mid-request) crashes Node by
+  default; the server now logs and keeps serving.
 
 Remaining groups: apply the same three steps (codemod → register → verify),
 then re-run `mem-bench.mjs` to track the curve.
