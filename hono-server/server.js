@@ -46,6 +46,10 @@ const v1beta = loaderFor("v1beta");
 const api = loaderFor("usage");
 const apiProviders = loaderFor("providers");
 const apiModels = loaderFor("models");
+const apiKeys = loaderFor("keys");
+const apiCombos = loaderFor("combos");
+const apiPools = loaderFor("proxy-pools");
+const apiSettings = loaderFor("settings");
 
 // Adapts a Next route handler to a Hono handler.
 // opts.catchAll: param name receiving path segments after catchAllPrefix.
@@ -219,6 +223,51 @@ const MODELS_ROUTES = [
   ["POST", "/models/test", () => apiModels("/test/route.js")],
 ];
 register("/api", MODELS_ROUTES);
+
+// ─── Admin group: keys ──────────────────────────────────────────────────────
+const KEYS_ROUTES = [
+  ["GET", "/keys", () => apiKeys("/route.js")],
+  ["POST", "/keys", () => apiKeys("/route.js")],
+  ["GET", "/keys/:id", () => apiKeys("/[id]/route.js"), { id: "id" }],
+  ["PUT", "/keys/:id", () => apiKeys("/[id]/route.js"), { id: "id" }],
+  ["DELETE", "/keys/:id", () => apiKeys("/[id]/route.js"), { id: "id" }],
+];
+register("/api", KEYS_ROUTES);
+
+// ─── Admin group: combos ────────────────────────────────────────────────────
+const COMBOS_ROUTES = [
+  ["GET", "/combos", () => apiCombos("/route.js")],
+  ["POST", "/combos", () => apiCombos("/route.js")],
+  ["GET", "/combos/:id", () => apiCombos("/[id]/route.js"), { id: "id" }],
+  ["PUT", "/combos/:id", () => apiCombos("/[id]/route.js"), { id: "id" }],
+  ["DELETE", "/combos/:id", () => apiCombos("/[id]/route.js"), { id: "id" }],
+];
+register("/api", COMBOS_ROUTES);
+
+// ─── Admin group: proxy-pools ───────────────────────────────────────────────
+const POOLS_ROUTES = [
+  ["GET", "/proxy-pools", () => apiPools("/route.js")],
+  ["POST", "/proxy-pools", () => apiPools("/route.js")],
+  ["POST", "/proxy-pools/cloudflare-deploy", () => apiPools("/cloudflare-deploy/route.js")],
+  ["POST", "/proxy-pools/deno-deploy", () => apiPools("/deno-deploy/route.js")],
+  ["POST", "/proxy-pools/vercel-deploy", () => apiPools("/vercel-deploy/route.js")],
+  ["GET", "/proxy-pools/:id", () => apiPools("/[id]/route.js"), { id: "id" }],
+  ["PUT", "/proxy-pools/:id", () => apiPools("/[id]/route.js"), { id: "id" }],
+  ["DELETE", "/proxy-pools/:id", () => apiPools("/[id]/route.js"), { id: "id" }],
+  ["POST", "/proxy-pools/:id/test", () => apiPools("/[id]/test/route.js"), { id: "id" }],
+];
+register("/api", POOLS_ROUTES);
+
+// ─── Admin group: settings ──────────────────────────────────────────────────
+const SETTINGS_ROUTES = [
+  ["GET", "/settings", () => apiSettings("/route.js")],
+  ["PATCH", "/settings", () => apiSettings("/route.js")],
+  ["GET", "/settings/database", () => apiSettings("/database/route.js")],
+  ["POST", "/settings/database", () => apiSettings("/database/route.js")],
+  ["POST", "/settings/proxy-test", () => apiSettings("/proxy-test/route.js")],
+  ["GET", "/settings/require-login", () => apiSettings("/require-login/route.js")],
+];
+register("/api", SETTINGS_ROUTES);
 
 // ─── Remaining Next rewrites, via internal re-dispatch ──────────────────────
 async function redispatch(c, newPath) {

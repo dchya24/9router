@@ -130,14 +130,15 @@ APIs, dashboard pages, static assets) to the Next standalone instance on a
 private port, with undici's stale `content-encoding`/`content-length` headers
 stripped. Next's own middleware re-validates proxied requests.
 
-**Groups migrated — `usage` (10 routes), `providers` (10), `models` (7).**
+**Groups migrated — `usage` (10), `providers` (10), `models` (7), `keys` (2),
+`combos` (2), `proxy-pools` (6), `settings` (4) = 41 admin routes.**
 Codemod `NextResponse.json(` → `Response.json(` + drop the `next/server`
 import, register in the route table (incl. dynamic `[id]`/`[connectionId]`
 routes and the EventEmitter-based `/usage/stream` SSE). Verified through the
 Hono front against a production-backup import: all migrated GET endpoints
-**byte-identical** to Next direct, dynamic `/providers/:id` parity, and full
-write-path round-trip (POST disable via Hono → visible to Next via the shared
-DB → DELETE via Hono → clean).
+**byte-identical** to Next direct (incl. dynamic `:id` routes), and full
+write-path round-trips through the shared DB (models/disabled, api keys —
+create via Hono → visible to Next → delete via Hono → clean).
 
 Remaining groups: apply the same three steps (codemod → register → verify),
 then re-run `mem-bench.mjs` to track the curve.

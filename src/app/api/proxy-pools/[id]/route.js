@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   deleteProxyPool,
   getProviderConnections,
@@ -56,13 +55,13 @@ export async function GET(request, { params }) {
     const proxyPool = await getProxyPoolById(id);
 
     if (!proxyPool) {
-      return NextResponse.json({ error: "Proxy pool not found" }, { status: 404 });
+      return Response.json({ error: "Proxy pool not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ proxyPool });
+    return Response.json({ proxyPool });
   } catch (error) {
     console.log("Error fetching proxy pool:", error);
-    return NextResponse.json({ error: "Failed to fetch proxy pool" }, { status: 500 });
+    return Response.json({ error: "Failed to fetch proxy pool" }, { status: 500 });
   }
 }
 
@@ -73,21 +72,21 @@ export async function PUT(request, { params }) {
     const existing = await getProxyPoolById(id);
 
     if (!existing) {
-      return NextResponse.json({ error: "Proxy pool not found" }, { status: 404 });
+      return Response.json({ error: "Proxy pool not found" }, { status: 404 });
     }
 
     const body = await request.json();
     const normalized = normalizeProxyPoolUpdate(body);
 
     if (normalized.error) {
-      return NextResponse.json({ error: normalized.error }, { status: 400 });
+      return Response.json({ error: normalized.error }, { status: 400 });
     }
 
     const updated = await updateProxyPool(id, normalized.updates);
-    return NextResponse.json({ proxyPool: updated });
+    return Response.json({ proxyPool: updated });
   } catch (error) {
     console.log("Error updating proxy pool:", error);
-    return NextResponse.json({ error: "Failed to update proxy pool" }, { status: 500 });
+    return Response.json({ error: "Failed to update proxy pool" }, { status: 500 });
   }
 }
 
@@ -98,14 +97,14 @@ export async function DELETE(request, { params }) {
     const existing = await getProxyPoolById(id);
 
     if (!existing) {
-      return NextResponse.json({ error: "Proxy pool not found" }, { status: 404 });
+      return Response.json({ error: "Proxy pool not found" }, { status: 404 });
     }
 
     const connections = await getProviderConnections();
     const boundConnectionCount = countBoundConnections(connections, id);
 
     if (boundConnectionCount > 0) {
-      return NextResponse.json(
+      return Response.json(
         {
           error: "Proxy pool is currently in use",
           boundConnectionCount,
@@ -115,9 +114,9 @@ export async function DELETE(request, { params }) {
     }
 
     await deleteProxyPool(id);
-    return NextResponse.json({ success: true });
+    return Response.json({ success: true });
   } catch (error) {
     console.log("Error deleting proxy pool:", error);
-    return NextResponse.json({ error: "Failed to delete proxy pool" }, { status: 500 });
+    return Response.json({ error: "Failed to delete proxy pool" }, { status: 500 });
   }
 }

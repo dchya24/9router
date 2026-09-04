@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createProxyPool } from "@/models";
 
 // Relay worker source code deployed to Cloudflare
@@ -55,7 +54,7 @@ export async function POST(request) {
     const projectName = body.projectName?.trim() || `relay-${Date.now().toString(36)}`;
 
     if (!accountId || !apiToken) {
-      return NextResponse.json({ error: "Cloudflare Account ID and API Token are required" }, { status: 400 });
+      return Response.json({ error: "Cloudflare Account ID and API Token are required" }, { status: 400 });
     }
 
     // 1. Upload Worker Script
@@ -81,7 +80,7 @@ export async function POST(request) {
     if (!uploadRes.ok) {
       const err = await uploadRes.json().catch(() => ({}));
       console.error("Cloudflare upload error:", err);
-      return NextResponse.json(
+      return Response.json(
         { error: err.errors?.[0]?.message || "Failed to upload Worker to Cloudflare" },
         { status: uploadRes.status }
       );
@@ -121,7 +120,7 @@ export async function POST(request) {
     }
 
     if (!deployUrl) {
-       return NextResponse.json(
+       return Response.json(
         { error: "Worker deployed but failed to retrieve workers.dev subdomain. Make sure you have setup a workers.dev subdomain in Cloudflare Dashboard." },
         { status: 400 }
       );
@@ -137,9 +136,9 @@ export async function POST(request) {
       strictProxy: false,
     });
 
-    return NextResponse.json({ proxyPool, deployUrl }, { status: 201 });
+    return Response.json({ proxyPool, deployUrl }, { status: 201 });
   } catch (error) {
     console.log("Error deploying Cloudflare relay:", error);
-    return NextResponse.json({ error: error.message || "Deploy failed" }, { status: 500 });
+    return Response.json({ error: error.message || "Deploy failed" }, { status: 500 });
   }
 }

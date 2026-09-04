@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { deleteApiKey, getApiKeyById, updateApiKey } from "@/lib/localDb";
 
 // GET /api/keys/[id] - Get single key
@@ -7,12 +6,12 @@ export async function GET(request, { params }) {
     const { id } = await params;
     const key = await getApiKeyById(id);
     if (!key) {
-      return NextResponse.json({ error: "Key not found" }, { status: 404 });
+      return Response.json({ error: "Key not found" }, { status: 404 });
     }
-    return NextResponse.json({ key });
+    return Response.json({ key });
   } catch (error) {
     console.log("Error fetching key:", error);
-    return NextResponse.json({ error: "Failed to fetch key" }, { status: 500 });
+    return Response.json({ error: "Failed to fetch key" }, { status: 500 });
   }
 }
 
@@ -25,7 +24,7 @@ export async function PUT(request, { params }) {
 
     const existing = await getApiKeyById(id);
     if (!existing) {
-      return NextResponse.json({ error: "Key not found" }, { status: 404 });
+      return Response.json({ error: "Key not found" }, { status: 404 });
     }
 
     const updateData = {};
@@ -33,10 +32,10 @@ export async function PUT(request, { params }) {
 
     const updated = await updateApiKey(id, updateData);
 
-    return NextResponse.json({ key: updated });
+    return Response.json({ key: updated });
   } catch (error) {
     console.log("Error updating key:", error);
-    return NextResponse.json({ error: "Failed to update key" }, { status: 500 });
+    return Response.json({ error: "Failed to update key" }, { status: 500 });
   }
 }
 
@@ -47,12 +46,12 @@ export async function DELETE(request, { params }) {
 
     const deleted = await deleteApiKey(id);
     if (!deleted) {
-      return NextResponse.json({ error: "Key not found" }, { status: 404 });
+      return Response.json({ error: "Key not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ message: "Key deleted successfully" });
+    return Response.json({ message: "Key deleted successfully" });
   } catch (error) {
     console.log("Error deleting key:", error);
-    return NextResponse.json({ error: "Failed to delete key" }, { status: 500 });
+    return Response.json({ error: "Failed to delete key" }, { status: 500 });
   }
 }

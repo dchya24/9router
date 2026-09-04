@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { exportDb, getSettings, importDb } from "@/lib/localDb";
 import { applyOutboundProxyEnv } from "@/lib/network/outboundProxy";
 import { verifyDashboardPassword } from "@/lib/auth/dashboardSession";
@@ -14,13 +13,13 @@ function isCliRequest(request) {
 export async function GET(request) {
   try {
     if (!isCliRequest(request) && !(await verifyDashboardPassword(request.headers.get(PASSWORD_HEADER)))) {
-      return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+      return Response.json({ error: "Invalid password" }, { status: 401 });
     }
     const payload = await exportDb();
-    return NextResponse.json(payload);
+    return Response.json(payload);
   } catch (error) {
     console.log("Error exporting database:", error);
-    return NextResponse.json({ error: "Failed to export database" }, { status: 500 });
+    return Response.json({ error: "Failed to export database" }, { status: 500 });
   }
 }
 
@@ -28,7 +27,7 @@ export async function POST(request) {
   try {
     const { password, ...payload } = await request.json();
     if (!isCliRequest(request) && !(await verifyDashboardPassword(password))) {
-      return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+      return Response.json({ error: "Invalid password" }, { status: 401 });
     }
     await importDb(payload);
 
@@ -40,10 +39,10 @@ export async function POST(request) {
       console.warn("[Settings][DatabaseImport] Failed to re-apply outbound proxy env:", err);
     }
 
-    return NextResponse.json({ success: true });
+    return Response.json({ success: true });
   } catch (error) {
     console.log("Error importing database:", error);
-    return NextResponse.json(
+    return Response.json(
       { error: error?.message || "Failed to import database" },
       { status: 400 }
     );
