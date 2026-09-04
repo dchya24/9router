@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-// Mirror the redaction logic from src/app/api/usage/request-details/route.js
+// Mirror the redaction logic from src/routes/usage/request-details/route.js
 // so we can test it in isolation.
 function redactDetails(details) {
   return (details || []).map((d) => {

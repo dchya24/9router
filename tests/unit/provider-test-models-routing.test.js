@@ -61,7 +61,7 @@ describe("provider test-models route kind routing", () => {
   });
 
   it("routes huggingface image models to /api/v1/images/generations", async () => {
-    const { POST } = await import("../../src/app/api/providers/[id]/test-models/route.js");
+    const { POST } = await import("../../src/routes/providers/[id]/test-models/route.js");
 
     const req = new Request("http://localhost/api/providers/conn-hf/test-models", {
       method: "POST",

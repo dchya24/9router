@@ -31,7 +31,7 @@ vi.mock("@/lib/auth/dashboardSession", () => ({
   getDashboardAuthSession: mocks.getDashboardAuthSession,
 }));
 
-const { GET } = await import("../../src/app/api/auth/status/route.js");
+const { GET } = await import("../../src/routes/auth/status/route.js");
 
 describe("GET /api/auth/status", () => {
   beforeEach(() => {

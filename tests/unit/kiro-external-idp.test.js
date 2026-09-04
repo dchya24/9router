@@ -158,7 +158,7 @@ describe("Kiro external_idp (CLIProxyAPI) import and refresh", () => {
       }),
     }));
 
-    const { POST } = await import("../../src/app/api/oauth/kiro/import-cli-proxy/route.js");
+    const { POST } = await import("../../src/routes/oauth/kiro/import-cli-proxy/route.js");
     const accessToken = makeJwt({
       preferred_username: TEST_EMAIL,
       exp: Math.floor(Date.now() / 1000) + 3600,

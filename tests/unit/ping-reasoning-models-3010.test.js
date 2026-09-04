@@ -12,7 +12,7 @@ vi.mock("@/lib/localDb", () => ({ getApiKeys: vi.fn(async () => [{ key: "test-ke
 vi.mock("@/shared/constants/config", () => ({ UPDATER_CONFIG: { appPort: 20127 } }));
 vi.mock("@/shared/utils/machineId", () => ({ getConsistentMachineId: vi.fn(async () => "cli-token") }));
 
-const { pingModelByKind } = await import("../../src/app/api/models/test/ping.js");
+const { pingModelByKind } = await import("../../src/routes/models/test/ping.js");
 
 describe("pingModelByKind reasoning models (#3010)", () => {
   let fetchMock;

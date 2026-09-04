@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const originalFetch = global.fetch;
 
-// Replicates the validation logic from app/src/app/api/providers/validate/route.js
+// Replicates the validation logic from app/src/routes/providers/validate/route.js
 async function validateGrokWeb(apiKey) {
   const token = apiKey.startsWith("sso=") ? apiKey.slice(4) : apiKey;
   const randomHex = (n) => {

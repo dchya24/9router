@@ -20,7 +20,7 @@ async function setupTestContext(nodeData) {
     },
   }));
 
-  const { POST } = await import("@/app/api/providers/route.js");
+  const { POST } = await import("@/routes/providers/route.js");
   const {
     createProviderNode,
     getProviderConnections,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { POST } from "../../src/app/api/v1/messages/count_tokens/route.js";
+import { POST } from "../../src/routes/v1/messages/count_tokens/route.js";
 
 async function countTokens(body) {
   const response = await POST(new Request("https://9router.local/v1/messages/count_tokens", {

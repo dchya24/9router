@@ -1,11 +1,11 @@
-import { notFound } from "next/navigation";
 import { CLI_TOOLS } from "@/shared/constants/cliTools";
-import { getMachineId } from "@/shared/utils/machine";
-import ToolDetailClient from "./ToolDetailClient";
+import ToolDetailLoader from "./ToolDetailLoader";
 
-export default async function ToolDetailPage({ params }) {
-  const { toolId } = await params;
-  if (!CLI_TOOLS[toolId]) notFound();
-  const machineId = await getMachineId();
-  return <ToolDetailClient toolId={toolId} machineId={machineId} />;
+// Static export: dynamic routes must be enumerated at build time.
+export function generateStaticParams() {
+  return Object.keys(CLI_TOOLS).map((toolId) => ({ toolId }));
+}
+
+export default function ToolDetailPage() {
+  return <ToolDetailLoader />;
 }

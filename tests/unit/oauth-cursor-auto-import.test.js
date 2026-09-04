@@ -55,7 +55,7 @@ describe("GET /api/oauth/cursor/auto-import", () => {
     // Force darwin so macOS-specific logic is exercised
     Object.defineProperty(process, "platform", { value: "darwin", writable: true });
     // Re-import to pick up fresh mocks each run
-    const mod = await import("../../src/app/api/oauth/cursor/auto-import/route.js");
+    const mod = await import("../../src/routes/oauth/cursor/auto-import/route.js");
     GET = mod.GET;
   });
 

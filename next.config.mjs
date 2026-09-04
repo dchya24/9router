@@ -7,12 +7,10 @@ const projectRoot = dirname(fileURLToPath(import.meta.url));
 const tracingRoot = process.env.NEXT_TRACING_ROOT_MODE === "workspace"
   ? join(projectRoot, "..")
   : projectRoot;
-const proxyClientMaxBodySize = process.env.NINEROUTER_PROXY_CLIENT_MAX_BODY_SIZE || "128mb";
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
-  output: "standalone",
+  output: "export",
   // `open` must stay external. It derives its own directory from `import.meta.url`, and
   // webpack replaces that with the absolute path of the BUILD machine as a string literal.
   // A release built on macOS therefore ships `file:///Users/.../open/index.js`, which
@@ -33,8 +31,6 @@ const nextConfig = {
   },
   env: {},
   experimental: {
-    // #1529/#1572: LLM clients can send long context or base64 image payloads through /v1 rewrites.
-    proxyClientMaxBodySize,
     // Cache fetch responses across HMR refreshes for faster dev reloads.
     serverComponentsHmrCache: true,
     // Tree-shake heavy barrel imports to cut compile + bundle size
@@ -57,42 +53,6 @@ const nextConfig = {
     };
     return config;
   },
-  async rewrites() {
-    return [
-      {
-        source: "/v1/v1/:path*",
-        destination: "/api/v1/:path*"
-      },
-      {
-        source: "/v1/v1",
-        destination: "/api/v1"
-      },
-      {
-        source: "/codex/:path*",
-        destination: "/api/v1/responses"
-      },
-      {
-        source: "/responses",
-        destination: "/api/v1/responses"
-      },
-      {
-        source: "/v1beta/:path*",
-        destination: "/api/v1beta/:path*"
-      },
-      {
-        source: "/v1beta",
-        destination: "/api/v1beta"
-      },
-      {
-        source: "/v1/:path*",
-        destination: "/api/v1/:path*"
-      },
-      {
-        source: "/v1",
-        destination: "/api/v1"
-      }
-    ];
-  }
 };
 
 export default nextConfig;

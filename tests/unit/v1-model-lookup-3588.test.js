@@ -4,11 +4,11 @@ const mocks = vi.hoisted(() => ({
   buildModelsList: vi.fn(),
 }));
 
-vi.mock("../../src/app/api/v1/models/route.js", () => ({
+vi.mock("../../src/routes/v1/models/route.js", () => ({
   buildModelsList: mocks.buildModelsList,
 }));
 
-const { GET } = await import("../../src/app/api/v1/models/[...model]/route.js");
+const { GET } = await import("../../src/routes/v1/models/[...model]/route.js");
 
 const chatModel = {
   id: "cc/claude-sonnet-5",

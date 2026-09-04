@@ -23,7 +23,7 @@ vi.mock("@/lib/network/connectionProxy", () => ({
   resolveConnectionProxyConfig: mocks.resolveConnectionProxyConfig,
 }));
 
-vi.mock("@/app/api/usage/[connectionId]/route.js", () => ({
+vi.mock("@/routes/usage/[connectionId]/route.js", () => ({
   refreshAndUpdateCredentials: mocks.refreshAndUpdateCredentials,
 }));
 
@@ -110,7 +110,7 @@ describe("Codex reset credits", () => {
     mocks.refreshAndUpdateCredentials.mockResolvedValue({ connection: refreshedConnection });
     mocks.getCodexRateLimitResetCredits.mockResolvedValue(resetCredits);
 
-    const { GET } = await import("../../src/app/api/usage/[connectionId]/codex-reset-credits/route.js");
+    const { GET } = await import("../../src/routes/usage/[connectionId]/codex-reset-credits/route.js");
     const response = await GET(new Request("http://localhost/api/usage/conn_1/codex-reset-credits"), {
       params: Promise.resolve({ connectionId: "conn_1" }),
     });
@@ -149,7 +149,7 @@ describe("Codex reset credits", () => {
       .mockRejectedValueOnce(new Error("Unauthorized 401"))
       .mockResolvedValueOnce(resetCredits);
 
-    const { GET } = await import("../../src/app/api/usage/[connectionId]/codex-reset-credits/route.js");
+    const { GET } = await import("../../src/routes/usage/[connectionId]/codex-reset-credits/route.js");
     const response = await GET(new Request("http://localhost/api/usage/conn_1/codex-reset-credits"), {
       params: Promise.resolve({ connectionId: "conn_1" }),
     });
@@ -177,7 +177,7 @@ describe("Codex reset credits", () => {
       windowsReset: 0,
     });
 
-    const { POST } = await import("../../src/app/api/usage/[connectionId]/codex-reset-credits/route.js");
+    const { POST } = await import("../../src/routes/usage/[connectionId]/codex-reset-credits/route.js");
     const response = await POST(new Request("http://localhost/api/usage/conn_1/codex-reset-credits", { method: "POST" }), {
       params: Promise.resolve({ connectionId: "conn_1" }),
     });

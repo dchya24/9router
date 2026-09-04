@@ -20,6 +20,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { registerGuards } from "./guard.js";
 import { runWithRequest } from "./shims/next-headers.mjs";
+import { createStaticHandler } from "./static.js";
 
 const PORT = Number(process.env.PORT || 20127);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -37,7 +38,7 @@ function loaderFor(baseDir) {
   return (rel) => {
     const key = `${baseDir}${rel}`;
     if (!modCache.has(key)) {
-      modCache.set(key, import(new URL(`../src/app/api/${baseDir}${rel}`, import.meta.url).href));
+      modCache.set(key, import(new URL(`../src/routes/${baseDir}${rel}`, import.meta.url).href));
     }
     return modCache.get(key);
   };
@@ -67,6 +68,7 @@ const apiOauth = loaderFor("oauth");
 const apiCliTools = loaderFor("cli-tools");
 const apiShutdown = loaderFor("shutdown");
 const apiProviderNodes = loaderFor("provider-nodes");
+const apiMachineId = loaderFor("machine-id");
 
 // Adapts a Next route handler to a Hono handler.
 // opts.catchAll: param name receiving path segments after catchAllPrefix.
@@ -468,6 +470,9 @@ register("/api", [
   ["POST", "/provider-nodes/validate", () => apiProviderNodes("/validate/route.js")],
 ]);
 
+// ─── Static-dashboard helper: machine id for client pages ──────────────────
+register("/api", [["GET", "/machine-id", () => apiMachineId("/route.js")]]);
+
 // ─── Remaining Next rewrites, via internal re-dispatch ──────────────────────
 async function redispatch(c, newPath) {
   const url = new URL(c.req.url);
@@ -493,10 +498,10 @@ app.all("/codex/*", (c) => redispatch(c, "/api/v1/responses"));
 // ─── Ops endpoints ──────────────────────────────────────────────────────────
 app.get("/healthz", (c) => c.json({ ok: true, server: "hono" }));
 
-// ─── Front-proxy mode (Phase 3 transition) ──────────────────────────────────
-// With NEXT_UPSTREAM set (e.g. http://127.0.0.1:20127), any path not handled
-// above — unmigrated admin APIs, dashboard pages, static assets — is proxied
-// to the Next standalone server on a private port. Hono owns the public port.
+// ─── Front-proxy / static-dashboard modes ───────────────────────────────────
+// NEXT_UPSTREAM (transition): unmigrated dashboard pages are proxied to a Next
+// standalone server on a private port. Otherwise (end-state): the exported
+// dashboard (Next output:"export") is served straight from disk.
 const NEXT_UPSTREAM = process.env.NEXT_UPSTREAM;
 if (NEXT_UPSTREAM) {
   const upstream = new URL(NEXT_UPSTREAM);
@@ -527,7 +532,13 @@ if (NEXT_UPSTREAM) {
     }
   });
 } else {
-  app.notFound((c) => c.json({ error: { message: "Not found", type: "invalid_request_error" } }, 404));
+  const exportDir = process.env.DASHBOARD_EXPORT_DIR || ".next-export-build";
+  const staticHandler = createStaticHandler(exportDir);
+  if (staticHandler) {
+    app.notFound(staticHandler);
+  } else {
+    app.notFound((c) => c.json({ error: { message: "Not found", type: "invalid_request_error" } }, 404));
+  }
 }
 
 app.onError((err, c) => {

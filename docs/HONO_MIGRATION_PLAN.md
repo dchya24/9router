@@ -1,9 +1,11 @@
 # Hono Migration Plan — Proxy API on bare Node
 
-_Status: **Phase 3 complete (2026-09-04)** — every route under `src/app/api/**`
-(154 files: 23 proxy-surface + 131 admin) is served by the Hono server; Next
-only serves dashboard pages/static assets via the front-proxy. Next up:
-Phase 3.5/4 review, then dashboard static export + decommission Next._
+_Status: **Phase 3 complete; Phase 4 dashboard-static working (2026-09-04)** —
+every route lives in Hono, and the dashboard now builds as a static export
+served by Hono itself. A pure-Hono process (`node --import
+./hono-server/register.mjs hono-server/server.js`, no Next) serves guard,
+APIs, proxy surface, and dashboard E2E. Remaining: production packaging
+(Dockerfile, CLI, start scripts) — see Phase 4 below._
 
 ## Goal
 
@@ -181,12 +183,36 @@ the end-state Hono deployment is strictly better here.
 Remaining groups: apply the same three steps (codemod → register → verify),
 then re-run `mem-bench.mjs` to track the curve.
 
-### Phase 3.5 — Port custom-server security wrapper (required before full front)
-Currently documented as TODO in `hono-server/server.js`:
-- `x-9r-real-ip` stamping + forwarding-header sanitization + peer token
-  (needed by login rate-limiting and request-detail redaction).
-- h2c upgrade downgrade (JBR clients).
-- 128 MB `proxyClientMaxBodySize` equivalent (Hono has no body limit today).
+### 🚧 Phase 4 — Static dashboard + decommission Next (dashboard-static works; packaging remains)
+
+Done:
+- **API tree relocated**: `src/app/api` → `src/routes` (plain source files; no
+  longer Next routes, so `output: "export"` is possible while Hono keeps
+  loading them directly). All `@/app/api` imports and tests updated.
+- **Dead deps removed**: `express`, `http-proxy-middleware` (never imported).
+- **Static export**: `next.config.mjs` → `output: "export"` (rewrites and the
+  proxy body-size experimental removed), `src/proxy.js` middleware deleted
+  (its logic lives in `hono-server/guard.js`).
+- **Page conversions for export**: dynamic pages export
+  `generateStaticParams` (client components moved to their own files); the
+  four machineId pages fetch `/api/machine-id` (new authed route) client-side
+  instead of a server render; root page is a client redirect; console-log
+  `force-dynamic` dropped; `manifest.js` forced static.
+- **`hono-server/static.js`**: serves the export dir with clean-URL resolution
+  (`.html`, `/index.html`) and a trim-until-shell SPA fallback — deep links
+  like `/dashboard/providers/<uuid>` serve the parent shell; client
+  components hydrate from the real URL.
+- E2E (pure Hono, no Next process): `/`→`/dashboard`→`/login` redirect chain,
+  login sets cookie, authed `/dashboard` + deep-link shells + `_next` assets
+  200, `/api/machine-id` authed JSON, `/v1/models` proxy intact, unauthed
+  `/api/keys` still 401. Bench unchanged: ~89–97 MB.
+
+Remaining:
+- Production packaging: Dockerfile (build static + run hono-server; drop
+  standalone copy steps), `cli/` launcher (spawns hono-server instead of
+  custom-server), `start.sh`/npm scripts, `cli-build-artifacts` test fixtures.
+- Post-cleanup: delete `custom-server.js`, `scripts/copy-standalone-assets.mjs`,
+  and the front-proxy code path once confident.
 
 ### Phase 4 — Auth + decommission Next
 - Migrate auth group (login/logout/status, SAML, OIDC). These use

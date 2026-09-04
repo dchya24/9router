@@ -5,7 +5,7 @@ vi.mock("../../src/lib/localDb.js", () => ({
 }));
 
 import { getProviderConnections } from "../../src/lib/localDb.js";
-import { GET } from "../../src/app/api/media-providers/tts/minimax/voices/route.js";
+import { GET } from "../../src/routes/media-providers/tts/minimax/voices/route.js";
 
 const originalFetch = global.fetch;
 

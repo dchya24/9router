@@ -2,7 +2,7 @@
  * Grok CLI connection-test semantics: 402 spending-limit is soft success (auth OK).
  */
 import { describe, it, expect } from "vitest";
-import { classifyOAuthProbeResult } from "../../src/app/api/providers/[id]/test/testUtils.js";
+import { classifyOAuthProbeResult } from "../../src/routes/providers/[id]/test/testUtils.js";
 import { PROVIDERS } from "../../open-sse/providers/index.js";
 
 const GROK_CLI_PROBE = {

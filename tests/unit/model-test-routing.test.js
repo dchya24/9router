@@ -45,7 +45,7 @@ describe("model test route kind routing", () => {
   });
 
   it("routes image model tests to /api/v1/images/generations", async () => {
-    const { POST } = await import("../../src/app/api/models/test/route.js");
+    const { POST } = await import("../../src/routes/models/test/route.js");
 
     const req = new Request("http://localhost/api/models/test", {
       method: "POST",
@@ -80,7 +80,7 @@ describe("model test route kind routing", () => {
       headers: { "Content-Type": "application/json" },
     }));
 
-    const { POST } = await import("../../src/app/api/models/test/route.js");
+    const { POST } = await import("../../src/routes/models/test/route.js");
 
     const req = new Request("http://localhost/api/models/test", {
       method: "POST",
@@ -115,7 +115,7 @@ describe("model test route kind routing", () => {
       headers: { "Content-Type": "application/json" },
     }));
 
-    const { POST } = await import("../../src/app/api/models/test/route.js");
+    const { POST } = await import("../../src/routes/models/test/route.js");
 
     const req = new Request("http://localhost/api/models/test", {
       method: "POST",
@@ -141,7 +141,7 @@ describe("model test route kind routing", () => {
       headers: { "Content-Type": "application/json" },
     }));
 
-    const { POST } = await import("../../src/app/api/models/test/route.js");
+    const { POST } = await import("../../src/routes/models/test/route.js");
 
     const req = new Request("http://localhost/api/models/test", {
       method: "POST",
@@ -173,7 +173,7 @@ describe("model test route kind routing", () => {
       headers: { "Content-Type": "application/json" },
     }));
 
-    const { POST } = await import("../../src/app/api/models/test/route.js");
+    const { POST } = await import("../../src/routes/models/test/route.js");
 
     const req = new Request("http://localhost/api/models/test", {
       method: "POST",

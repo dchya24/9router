@@ -92,3 +92,6 @@ graphify-out/*
 .kiro/
 # DB backup exports contain provider credentials
 /9router-backup-*.json
+
+# static export build output
+/.next-export-build/

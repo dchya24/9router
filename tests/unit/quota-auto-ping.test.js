@@ -12,7 +12,7 @@ vi.mock("@/lib/network/connectionProxy", () => ({
   resolveConnectionProxyConfig: vi.fn(),
 }));
 
-vi.mock("@/app/api/usage/[connectionId]/route.js", () => ({
+vi.mock("@/routes/usage/[connectionId]/route.js", () => ({
   refreshAndUpdateCredentials: vi.fn(),
 }));
 

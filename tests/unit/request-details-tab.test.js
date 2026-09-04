@@ -206,7 +206,7 @@ describe("token helpers — render-time crash safety", () => {
 describe("API route contract — validation boundary", () => {
   let GET;
   beforeAll(async () => {
-    ({ GET } = await import("@/app/api/usage/request-details/route.js"));
+    ({ GET } = await import("@/routes/usage/request-details/route.js"));
   });
 
   function makeReq(query) {
