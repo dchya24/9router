@@ -1,7 +1,6 @@
 import os from "os";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { NextResponse } from "next/server";
 import { isTailscaleInstalled, isTailscaleLoggedIn, isSystemDaemonRunning, getTailscaleBin, TAILSCALE_SOCKET } from "@/lib/tunnel";
 import { getCachedPassword, loadEncryptedPassword } from "@/mitm/manager";
 
@@ -47,8 +46,8 @@ export async function GET() {
     const daemonRunning = customDaemonRunning || systemDaemonRunning;
     const loggedIn = daemonRunning ? isTailscaleLoggedIn() : false;
     const hasCachedPassword = !!(getCachedPassword() || await loadEncryptedPassword());
-    return NextResponse.json({ installed, loggedIn, platform, brewAvailable, daemonRunning, customDaemonRunning, systemDaemonRunning, hasCachedPassword });
+    return Response.json({ installed, loggedIn, platform, brewAvailable, daemonRunning, customDaemonRunning, systemDaemonRunning, hasCachedPassword });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

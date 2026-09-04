@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { getProviderConnections } from "@/lib/localDb";
 
 const langNames = new Intl.DisplayNames(["en"], { type: "language" });
@@ -14,14 +13,14 @@ export async function GET(request) {
 
     const connections = await getProviderConnections({ provider: "inworld", isActive: true });
     const apiKey = connections[0]?.apiKey;
-    if (!apiKey) return NextResponse.json({ error: "No Inworld connection found" }, { status: 400 });
+    if (!apiKey) return Response.json({ error: "No Inworld connection found" }, { status: 400 });
 
     const res = await fetch("https://api.inworld.ai/tts/v1/voices", {
       headers: { "Authorization": `Basic ${apiKey}` },
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      return NextResponse.json({ error: `Inworld API ${res.status}: ${text || "Failed"}` }, { status: 502 });
+      return Response.json({ error: `Inworld API ${res.status}: ${text || "Failed"}` }, { status: 502 });
     }
     const data = await res.json();
     const voices = data.voices || [];
@@ -52,10 +51,10 @@ export async function GET(request) {
     const languages = Object.values(byLang).sort((a, b) => a.name.localeCompare(b.name));
 
     if (langFilter) {
-      return NextResponse.json({ voices: byLang[langFilter]?.voices || [] });
+      return Response.json({ voices: byLang[langFilter]?.voices || [] });
     }
-    return NextResponse.json({ languages, byLang });
+    return Response.json({ languages, byLang });
   } catch (err) {
-    return NextResponse.json({ error: err.message || "Failed to fetch voices" }, { status: 502 });
+    return Response.json({ error: err.message || "Failed to fetch voices" }, { status: 502 });
   }
 }

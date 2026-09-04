@@ -1,5 +1,4 @@
 import { VOICE_FETCHERS } from "open-sse/handlers/ttsCore.js";
-import { NextResponse } from "next/server";
 
 // Map locale code → country name
 const LOCALE_NAMES = new Intl.DisplayNames(["en"], { type: "region" });
@@ -28,7 +27,7 @@ export async function GET(request) {
 
     const fetcher = VOICE_FETCHERS[provider];
     if (!fetcher) {
-      return NextResponse.json({ error: `Provider '${provider}' does not support voice listing` }, { status: 400 });
+      return Response.json({ error: `Provider '${provider}' does not support voice listing` }, { status: 400 });
     }
 
     // ElevenLabs requires API key
@@ -92,8 +91,8 @@ export async function GET(request) {
     // Sorted language list
     const languages = Object.values(byLang).sort((a, b) => a.name.localeCompare(b.name));
 
-    return NextResponse.json({ voices, languages, byLang });
+    return Response.json({ voices, languages, byLang });
   } catch (err) {
-    return NextResponse.json({ error: err.message || "Failed to fetch voices" }, { status: 502 });
+    return Response.json({ error: err.message || "Failed to fetch voices" }, { status: 502 });
   }
 }

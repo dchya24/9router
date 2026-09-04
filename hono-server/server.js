@@ -57,6 +57,10 @@ const apiInit = loaderFor("init");
 const apiHealth = loaderFor("health");
 const apiTranslator = loaderFor("translator");
 const apiMcp = loaderFor("mcp");
+const apiPxpipe = loaderFor("pxpipe");
+const apiHeadroom = loaderFor("headroom");
+const apiMedia = loaderFor("media-providers");
+const apiTunnel = loaderFor("tunnel");
 
 // Adapts a Next route handler to a Hono handler.
 // opts.catchAll: param name receiving path segments after catchAllPrefix.
@@ -302,6 +306,54 @@ register("/api", [
   // /api/mcp is LOCAL_ONLY (guard) — MCP server SSE + message endpoints
   ["GET", "/mcp/:plugin/sse", () => apiMcp("/[plugin]/sse/route.js"), { id: "plugin" }],
   ["POST", "/mcp/:plugin/message", () => apiMcp("/[plugin]/message/route.js"), { id: "plugin" }],
+]);
+
+// ─── Admin batch: pxpipe, headroom, media-providers, tunnel ────────────────
+// pxpipe start/stop/restart/install and headroom/tunnel lifecycle POSTs spawn
+// or control host processes — registered here, never exercised in tests.
+register("/api", [
+  ["POST", "/pxpipe/health", () => apiPxpipe("/health/route.js")],
+  ["POST", "/pxpipe/install", () => apiPxpipe("/install/route.js")],
+  ["GET", "/pxpipe/logs", () => apiPxpipe("/logs/route.js")],
+  ["POST", "/pxpipe/restart", () => apiPxpipe("/restart/route.js")],
+  ["POST", "/pxpipe/start", () => apiPxpipe("/start/route.js")],
+  ["GET", "/pxpipe/stats", () => apiPxpipe("/stats/route.js")],
+  ["GET", "/pxpipe/status", () => apiPxpipe("/status/route.js")],
+  ["POST", "/pxpipe/stop", () => apiPxpipe("/stop/route.js")],
+]);
+register("/api", [
+  ["GET", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
+  ["POST", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
+  ["DELETE", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
+  ["POST", "/headroom/restart", () => apiHeadroom("/restart/route.js")],
+  ["POST", "/headroom/start", () => apiHeadroom("/start/route.js")],
+  ["GET", "/headroom/status", () => apiHeadroom("/status/route.js")],
+  ["POST", "/headroom/stop", () => apiHeadroom("/stop/route.js")],
+  // Reverse proxy to the headroom app (all methods; LOCAL_ONLY /headroom/start,
+  // /stop, /proxy paths are gated by the guard above).
+  ["GET", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+  ["POST", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+  ["PUT", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+  ["PATCH", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+  ["DELETE", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+  ["HEAD", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+  ["OPTIONS", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+]);
+register("/api", [
+  ["GET", "/media-providers/tts/voices", () => apiMedia("/tts/voices/route.js")],
+  ["GET", "/media-providers/tts/deepgram/voices", () => apiMedia("/tts/deepgram/voices/route.js")],
+  ["GET", "/media-providers/tts/elevenlabs/voices", () => apiMedia("/tts/elevenlabs/voices/route.js")],
+  ["GET", "/media-providers/tts/inworld/voices", () => apiMedia("/tts/inworld/voices/route.js")],
+  ["GET", "/media-providers/tts/minimax/voices", () => apiMedia("/tts/minimax/voices/route.js")],
+]);
+register("/api", [
+  ["POST", "/tunnel/disable", () => apiTunnel("/disable/route.js")],
+  ["POST", "/tunnel/enable", () => apiTunnel("/enable/route.js")],
+  ["GET", "/tunnel/status", () => apiTunnel("/status/route.js")],
+  ["GET", "/tunnel/tailscale-check", () => apiTunnel("/tailscale-check/route.js")],
+  ["POST", "/tunnel/tailscale-disable", () => apiTunnel("/tailscale-disable/route.js")],
+  ["POST", "/tunnel/tailscale-enable", () => apiTunnel("/tailscale-enable/route.js")],
+  ["POST", "/tunnel/tailscale-install", () => apiTunnel("/tailscale-install/route.js")],
 ]);
 
 // ─── Remaining Next rewrites, via internal re-dispatch ──────────────────────

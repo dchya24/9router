@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { getSettings } from "@/lib/localDb";
 import { DEFAULT_HEADROOM_URL } from "@/lib/headroom/detect";
 
@@ -82,16 +81,16 @@ async function proxy(request, { params }) {
       const contentType = response.headers.get("content-type") || "";
       if (contentType.includes("text/html")) {
         headers.delete("content-length");
-        return new NextResponse(rewriteDashboardHtml(await response.text()), {
+        return new Response(rewriteDashboardHtml(await response.text()), {
           status: response.status,
           headers,
         });
       }
     }
 
-    return new NextResponse(response.body, { status: response.status, headers });
+    return new Response(response.body, { status: response.status, headers });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }
 

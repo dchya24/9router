@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { enableTailscale } from "@/lib/tunnel";
 import { getSettings } from "@/lib/localDb";
 import { configureTunnelMonitoring } from "@/shared/services/initializeApp";
@@ -9,9 +8,9 @@ export async function POST() {
     getSettings()
       .then(configureTunnelMonitoring)
       .catch((error) => console.warn("Tailscale monitor start failed:", error.message));
-    return NextResponse.json(result);
+    return Response.json(result);
   } catch (error) {
     console.error("Tailscale enable error:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

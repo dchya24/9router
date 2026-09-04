@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { getProviderConnections } from "@/lib/localDb";
 
 const MINIMAX_VOICE_ENDPOINTS = {
@@ -72,7 +71,7 @@ export async function GET(request) {
     const connections = await getProviderConnections({ provider, isActive: true });
     const apiKey = connections[0]?.apiKey;
     if (!apiKey) {
-      return NextResponse.json({ error: `No ${provider} connection found` }, { status: 400 });
+      return Response.json({ error: `No ${provider} connection found` }, { status: 400 });
     }
 
     const res = await fetch(MINIMAX_VOICE_ENDPOINTS[provider], {
@@ -95,19 +94,19 @@ export async function GET(request) {
     const statusMessage = baseResp.status_msg || baseResp.statusMsg || data.message || "";
 
     if (!res.ok) {
-      return NextResponse.json({ error: `MiniMax API ${res.status}: ${statusMessage || rawText || "Failed"}` }, { status: 502 });
+      return Response.json({ error: `MiniMax API ${res.status}: ${statusMessage || rawText || "Failed"}` }, { status: 502 });
     }
     if (statusCode !== 0) {
-      return NextResponse.json({ error: statusMessage || "MiniMax voice API error" }, { status: 502 });
+      return Response.json({ error: statusMessage || "MiniMax voice API error" }, { status: 502 });
     }
 
     const normalized = normalizeMiniMaxVoices(data);
     if (langFilter) {
-      return NextResponse.json({ voices: normalized.byLang[langFilter]?.voices || [] });
+      return Response.json({ voices: normalized.byLang[langFilter]?.voices || [] });
     }
 
-    return NextResponse.json(normalized);
+    return Response.json(normalized);
   } catch (err) {
-    return NextResponse.json({ error: err.message || "Failed to fetch MiniMax voices" }, { status: 502 });
+    return Response.json({ error: err.message || "Failed to fetch MiniMax voices" }, { status: 502 });
   }
 }

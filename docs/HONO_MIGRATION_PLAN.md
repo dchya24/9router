@@ -133,7 +133,8 @@ stripped. Next's own middleware re-validates proxied requests.
 **Groups migrated — `usage` (10), `providers` (10), `models` (7), `keys` (2),
 `combos` (2), `proxy-pools` (6), `settings` (4), `version` (3), `pricing` (1),
 `tags` (1), `init` (1), `health` (1), `locale` (1), `translator` (6),
-`mcp` (2) = 56 admin routes.**
+`mcp` (2), `pxpipe` (8), `headroom` (6), `media-providers` (5),
+`tunnel` (7) = 82 admin routes.**
 Codemod `NextResponse.json(` → `Response.json(` + drop the `next/server`
 import, register in the route table (incl. dynamic `[id]`/`[connectionId]`/
 `[plugin]` routes, the EventEmitter-based `/usage/stream` SSE, and the ported

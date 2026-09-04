@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { installPxpipe } from "@/lib/pxpipe/install.js";
 import { unloadPxpipe } from "@/lib/pxpipe/loader.js";
 import { runHealthCheck } from "@/lib/pxpipe/service.js";
@@ -13,8 +12,8 @@ export async function POST() {
     const info = await installPxpipe();
     unloadPxpipe(); // drop any previously-loaded version so health loads the fresh one
     const health = await runHealthCheck();
-    return NextResponse.json({ ...info, health });
+    return Response.json({ ...info, health });
   } catch (error) {
-    return NextResponse.json({ error: error.message, code: error.code || null }, { status: 500 });
+    return Response.json({ error: error.message, code: error.code || null }, { status: 500 });
   }
 }

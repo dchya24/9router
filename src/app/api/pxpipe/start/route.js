@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { getSettings } from "@/lib/localDb";
 import { getInstallInfo, installPxpipe } from "@/lib/pxpipe/install.js";
 import { loadPxpipe } from "@/lib/pxpipe/loader.js";
@@ -14,13 +13,13 @@ export async function POST() {
     if (!getInstallInfo().installed) {
       const settings = await getSettings();
       if (!settings.pxpipeAutoInstall) {
-        return NextResponse.json({ error: "PXPIPE is not installed", code: "NOT_INSTALLED" }, { status: 409 });
+        return Response.json({ error: "PXPIPE is not installed", code: "NOT_INSTALLED" }, { status: 409 });
       }
       await installPxpipe();
     }
     await loadPxpipe();
-    return NextResponse.json(getPxpipeStatus());
+    return Response.json(getPxpipeStatus());
   } catch (error) {
-    return NextResponse.json({ error: error.message, code: error.code || null }, { status: 500 });
+    return Response.json({ error: error.message, code: error.code || null }, { status: 500 });
   }
 }
