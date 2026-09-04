@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   getProviderConnections,
   updateProviderConnection,
@@ -50,13 +49,13 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({
+    return Response.json({
       models,
       unavailableCount: models.length,
     });
   } catch (error) {
     console.error("[API] Failed to get model availability:", error);
-    return NextResponse.json(
+    return Response.json(
       { error: "Failed to fetch model availability" },
       { status: 500 },
     );
@@ -68,7 +67,7 @@ export async function POST(request) {
     const { action, provider, model } = await request.json();
 
     if (action !== "clearCooldown" || !provider || !model) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      return Response.json({ error: "Invalid request" }, { status: 400 });
     }
 
     const connections = await getProviderConnections({ provider });
@@ -92,10 +91,10 @@ export async function POST(request) {
         ),
     );
 
-    return NextResponse.json({ ok: true });
+    return Response.json({ ok: true });
   } catch (error) {
     console.error("[API] Failed to clear model cooldown:", error);
-    return NextResponse.json(
+    return Response.json(
       { error: "Failed to clear cooldown" },
       { status: 500 },
     );

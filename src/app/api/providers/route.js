@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   getProviderConnections,
   createProviderConnection,
@@ -76,10 +75,10 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ connections: safeConnections });
+    return Response.json({ connections: safeConnections });
   } catch (error) {
     console.log("Error fetching providers:", error);
-    return NextResponse.json({ error: "Failed to fetch providers" }, { status: 500 });
+    return Response.json({ error: "Failed to fetch providers" }, { status: 500 });
   }
 }
 
@@ -91,12 +90,12 @@ export async function POST(request) {
     const { apiKey, name, displayName, priority, globalPriority, defaultModel, testStatus } = body;
     const proxyConfig = normalizeProxyConfig(body);
     if (proxyConfig.error) {
-      return NextResponse.json({ error: proxyConfig.error }, { status: 400 });
+      return Response.json({ error: proxyConfig.error }, { status: 400 });
     }
 
     const proxyPoolResult = await normalizeProxyPoolId(body.proxyPoolId);
     if (proxyPoolResult.error) {
-      return NextResponse.json({ error: proxyPoolResult.error }, { status: 400 });
+      return Response.json({ error: proxyPoolResult.error }, { status: 400 });
     }
     const proxyPoolId = proxyPoolResult.proxyPoolId;
 
@@ -114,14 +113,14 @@ export async function POST(request) {
       isCustomEmbeddingProvider(provider);
 
     if (!provider || !isValidProvider) {
-      return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
+      return Response.json({ error: "Invalid provider" }, { status: 400 });
     }
     if (!apiKey && provider !== "ollama-local") {
-      return NextResponse.json({ error: `${isWebCookieProvider ? "Cookie value" : "API Key"} is required` }, { status: 400 });
+      return Response.json({ error: `${isWebCookieProvider ? "Cookie value" : "API Key"} is required` }, { status: 400 });
     }
     const connectionName = name || displayName || AI_PROVIDERS[provider]?.name;
     if (!connectionName) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+      return Response.json({ error: "Name is required" }, { status: 400 });
     }
 
     let providerSpecificData = normalizeProviderSpecificData(provider, body, body.providerSpecificData);
@@ -131,7 +130,7 @@ export async function POST(request) {
     if (isOpenAICompatibleProvider(provider)) {
       const node = await getProviderNodeById(provider);
       if (!node) {
-        return NextResponse.json({ error: "OpenAI Compatible node not found" }, { status: 404 });
+        return Response.json({ error: "OpenAI Compatible node not found" }, { status: 404 });
       }
       providerSpecificData = {
         prefix: node.prefix,
@@ -142,7 +141,7 @@ export async function POST(request) {
     } else if (isAnthropicCompatibleProvider(provider)) {
       const node = await getProviderNodeById(provider);
       if (!node) {
-        return NextResponse.json({ error: "Anthropic Compatible node not found" }, { status: 404 });
+        return Response.json({ error: "Anthropic Compatible node not found" }, { status: 404 });
       }
       providerSpecificData = {
         prefix: node.prefix,
@@ -152,7 +151,7 @@ export async function POST(request) {
     } else if (isCustomEmbeddingProvider(provider)) {
       const node = await getProviderNodeById(provider);
       if (!node) {
-        return NextResponse.json({ error: "Custom Embedding node not found" }, { status: 404 });
+        return Response.json({ error: "Custom Embedding node not found" }, { status: 404 });
       }
       providerSpecificData = {
         prefix: node.prefix,
@@ -189,9 +188,9 @@ export async function POST(request) {
     const result = { ...newConnection };
     delete result.apiKey;
 
-    return NextResponse.json({ connection: result }, { status: 201 });
+    return Response.json({ connection: result }, { status: 201 });
   } catch (error) {
     console.log("Error creating provider:", error);
-    return NextResponse.json({ error: "Failed to create provider" }, { status: 500 });
+    return Response.json({ error: "Failed to create provider" }, { status: 500 });
   }
 }

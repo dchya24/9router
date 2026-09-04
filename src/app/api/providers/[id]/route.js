@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   getProviderConnectionById,
   getProxyPoolById,
@@ -66,7 +65,7 @@ export async function GET(request, { params }) {
     const connection = await getProviderConnectionById(id);
 
     if (!connection) {
-      return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+      return Response.json({ error: "Connection not found" }, { status: 404 });
     }
 
     // Hide sensitive fields
@@ -76,10 +75,10 @@ export async function GET(request, { params }) {
     delete result.refreshToken;
     delete result.idToken;
 
-    return NextResponse.json({ connection: result });
+    return Response.json({ connection: result });
   } catch (error) {
     console.log("Error fetching connection:", error);
-    return NextResponse.json({ error: "Failed to fetch connection" }, { status: 500 });
+    return Response.json({ error: "Failed to fetch connection" }, { status: 500 });
   }
 }
 
@@ -103,17 +102,17 @@ export async function PUT(request, { params }) {
 
     const existing = await getProviderConnectionById(id);
     if (!existing) {
-      return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+      return Response.json({ error: "Connection not found" }, { status: 404 });
     }
 
     const proxyConfig = normalizeProxyConfig(body);
     if (proxyConfig.error) {
-      return NextResponse.json({ error: proxyConfig.error }, { status: 400 });
+      return Response.json({ error: proxyConfig.error }, { status: 400 });
     }
 
     const proxyPoolResult = await normalizeProxyPoolUpdate(body.proxyPoolId);
     if (proxyPoolResult.error) {
-      return NextResponse.json({ error: proxyPoolResult.error }, { status: 400 });
+      return Response.json({ error: proxyPoolResult.error }, { status: 400 });
     }
 
     const updateData = {};
@@ -164,10 +163,10 @@ export async function PUT(request, { params }) {
     delete result.refreshToken;
     delete result.idToken;
 
-    return NextResponse.json({ connection: result });
+    return Response.json({ connection: result });
   } catch (error) {
     console.log("Error updating connection:", error);
-    return NextResponse.json({ error: "Failed to update connection" }, { status: 500 });
+    return Response.json({ error: "Failed to update connection" }, { status: 500 });
   }
 }
 
@@ -178,12 +177,12 @@ export async function DELETE(request, { params }) {
 
     const deleted = await deleteProviderConnection(id);
     if (!deleted) {
-      return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+      return Response.json({ error: "Connection not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ message: "Connection deleted successfully" });
+    return Response.json({ message: "Connection deleted successfully" });
   } catch (error) {
     console.log("Error deleting connection:", error);
-    return NextResponse.json({ error: "Failed to delete connection" }, { status: 500 });
+    return Response.json({ error: "Failed to delete connection" }, { status: 500 });
   }
 }

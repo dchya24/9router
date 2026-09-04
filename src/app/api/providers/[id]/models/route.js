@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { getProviderConnectionById } from "@/models";
 import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "@/shared/constants/providers";
 import { GEMINI_CONFIG } from "@/lib/oauth/constants/oauth";
@@ -445,13 +444,13 @@ export async function GET(request, { params }) {
     const connection = await getProviderConnectionById(id);
 
     if (!connection) {
-      return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+      return Response.json({ error: "Connection not found" }, { status: 404 });
     }
 
     if (isOpenAICompatibleProvider(connection.provider)) {
       const baseUrl = connection.providerSpecificData?.baseUrl;
       if (!baseUrl) {
-        return NextResponse.json({ error: "No base URL configured for OpenAI compatible provider" }, { status: 400 });
+        return Response.json({ error: "No base URL configured for OpenAI compatible provider" }, { status: 400 });
       }
       const url = `${baseUrl.replace(/\/$/, "")}/models`;
       const response = await fetch(url, {
@@ -465,7 +464,7 @@ export async function GET(request, { params }) {
       if (!response.ok) {
         const errorText = await response.text();
         console.log(`Error fetching models from ${connection.provider}:`, errorText);
-        return NextResponse.json(
+        return Response.json(
           { error: `Failed to fetch models: ${response.status}` },
           { status: response.status }
         );
@@ -474,7 +473,7 @@ export async function GET(request, { params }) {
       const data = await response.json();
       const models = data.data || data.models || [];
 
-      return NextResponse.json({
+      return Response.json({
         provider: connection.provider,
         connectionId: connection.id,
         models
@@ -484,7 +483,7 @@ export async function GET(request, { params }) {
     if (isAnthropicCompatibleProvider(connection.provider)) {
       let baseUrl = connection.providerSpecificData?.baseUrl;
       if (!baseUrl) {
-        return NextResponse.json({ error: "No base URL configured for Anthropic compatible provider" }, { status: 400 });
+        return Response.json({ error: "No base URL configured for Anthropic compatible provider" }, { status: 400 });
       }
 
       baseUrl = baseUrl.replace(/\/$/, "");
@@ -506,7 +505,7 @@ export async function GET(request, { params }) {
       if (!response.ok) {
         const errorText = await response.text();
         console.log(`Error fetching models from ${connection.provider}:`, errorText);
-        return NextResponse.json(
+        return Response.json(
           { error: `Failed to fetch models: ${response.status}` },
           { status: response.status }
         );
@@ -515,7 +514,7 @@ export async function GET(request, { params }) {
       const data = await response.json();
       const models = data.data || data.models || [];
 
-      return NextResponse.json({
+      return Response.json({
         provider: connection.provider,
         connectionId: connection.id,
         models
@@ -524,7 +523,7 @@ export async function GET(request, { params }) {
 
     const config = PROVIDER_MODELS_CONFIG[connection.provider];
     if (!config) {
-      return NextResponse.json(
+      return Response.json(
         { error: `Provider ${connection.provider} does not support models listing` },
         { status: 400 }
       );
@@ -534,9 +533,9 @@ export async function GET(request, { params }) {
     if (typeof config.customResolver === "function") {
       const result = await config.customResolver(connection);
       if (result.error) {
-        return NextResponse.json({ error: result.error }, { status: result.status || 500 });
+        return Response.json({ error: result.error }, { status: result.status || 500 });
       }
-      return NextResponse.json({
+      return Response.json({
         provider: connection.provider,
         connectionId: connection.id,
         models: result.models,
@@ -547,7 +546,7 @@ export async function GET(request, { params }) {
     // Get auth token
     const token = connection.providerSpecificData?.copilotToken || connection.accessToken || connection.apiKey;
     if (!token) {
-      return NextResponse.json({ error: "No valid token found" }, { status: 401 });
+      return Response.json({ error: "No valid token found" }, { status: 401 });
     }
 
     // Build request URL
@@ -577,7 +576,7 @@ export async function GET(request, { params }) {
     if (!response.ok) {
       const errorText = await response.text();
       console.log(`Error fetching models from ${connection.provider}:`, errorText);
-      return NextResponse.json(
+      return Response.json(
         { error: `Failed to fetch models: ${response.status}` },
         { status: response.status }
       );
@@ -586,13 +585,13 @@ export async function GET(request, { params }) {
     const data = await response.json();
     const models = config.parseResponse(data);
 
-    return NextResponse.json({
+    return Response.json({
       provider: connection.provider,
       connectionId: connection.id,
       models
     });
   } catch (error) {
     console.log("Error fetching provider models:", error);
-    return NextResponse.json({ error: "Failed to fetch models" }, { status: 500 });
+    return Response.json({ error: "Failed to fetch models" }, { status: 500 });
   }
 }

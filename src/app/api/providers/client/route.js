@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { getProviderConnections } from "@/lib/localDb";
 import { backfillCodexEmails } from "@/lib/oauth/providers";
 import { USAGE_APIKEY_PROVIDERS, USAGE_SUPPORTED_PROVIDERS } from "@/shared/constants/providers";
@@ -106,7 +105,7 @@ export async function GET(request) {
     const offset = (currentPage - 1) * pageSize;
     const pageConnections = sortedConnections.slice(offset, offset + pageSize).map(sanitize);
 
-    return NextResponse.json({
+    return Response.json({
       connections: pageConnections,
       providerOptions,
       pagination: {
@@ -122,6 +121,6 @@ export async function GET(request) {
     });
   } catch (error) {
     console.log("Error fetching providers for client:", error);
-    return NextResponse.json({ error: "Failed to fetch providers" }, { status: 500 });
+    return Response.json({ error: "Failed to fetch providers" }, { status: 500 });
   }
 }

@@ -44,6 +44,8 @@ function loaderFor(baseDir) {
 const v1 = loaderFor("v1");
 const v1beta = loaderFor("v1beta");
 const api = loaderFor("usage");
+const apiProviders = loaderFor("providers");
+const apiModels = loaderFor("models");
 
 // Adapts a Next route handler to a Hono handler.
 // opts.catchAll: param name receiving path segments after catchAllPrefix.
@@ -177,6 +179,46 @@ const USAGE_ROUTES = [
   ["POST", "/usage/:connectionId/codex-reset-credits", () => api("/[connectionId]/codex-reset-credits/route.js"), { id: "connectionId" }],
 ];
 register("/api", USAGE_ROUTES);
+
+// ─── Admin group: providers ─────────────────────────────────────────────────
+const PROVIDERS_ROUTES = [
+  ["GET", "/providers", () => apiProviders("/route.js")],
+  ["POST", "/providers", () => apiProviders("/route.js")],
+  ["GET", "/providers/client", () => apiProviders("/client/route.js")],
+  ["GET", "/providers/suggested-models", () => apiProviders("/suggested-models/route.js")],
+  ["GET", "/providers/kilo/free-models", () => apiProviders("/kilo/free-models/route.js")],
+  ["POST", "/providers/test-batch", () => apiProviders("/test-batch/route.js")],
+  ["POST", "/providers/validate", () => apiProviders("/validate/route.js")],
+  // /providers/[id]
+  ["GET", "/providers/:id", () => apiProviders("/[id]/route.js"), { id: "id" }],
+  ["PUT", "/providers/:id", () => apiProviders("/[id]/route.js"), { id: "id" }],
+  ["DELETE", "/providers/:id", () => apiProviders("/[id]/route.js"), { id: "id" }],
+  ["GET", "/providers/:id/models", () => apiProviders("/[id]/models/route.js"), { id: "id" }],
+  ["POST", "/providers/:id/test", () => apiProviders("/[id]/test/route.js"), { id: "id" }],
+  ["POST", "/providers/:id/test-models", () => apiProviders("/[id]/test-models/route.js"), { id: "id" }],
+];
+register("/api", PROVIDERS_ROUTES);
+
+// ─── Admin group: models ────────────────────────────────────────────────────
+const MODELS_ROUTES = [
+  ["GET", "/models", () => apiModels("/route.js")],
+  ["PUT", "/models", () => apiModels("/route.js")],
+  ["GET", "/models/alias", () => apiModels("/alias/route.js")],
+  ["PUT", "/models/alias", () => apiModels("/alias/route.js")],
+  ["DELETE", "/models/alias", () => apiModels("/alias/route.js")],
+  ["GET", "/models/availability", () => apiModels("/availability/route.js")],
+  ["POST", "/models/availability", () => apiModels("/availability/route.js")],
+  ["GET", "/models/catalog-sync", () => apiModels("/catalog-sync/route.js")],
+  ["POST", "/models/catalog-sync", () => apiModels("/catalog-sync/route.js")],
+  ["GET", "/models/custom", () => apiModels("/custom/route.js")],
+  ["POST", "/models/custom", () => apiModels("/custom/route.js")],
+  ["DELETE", "/models/custom", () => apiModels("/custom/route.js")],
+  ["GET", "/models/disabled", () => apiModels("/disabled/route.js")],
+  ["POST", "/models/disabled", () => apiModels("/disabled/route.js")],
+  ["DELETE", "/models/disabled", () => apiModels("/disabled/route.js")],
+  ["POST", "/models/test", () => apiModels("/test/route.js")],
+];
+register("/api", MODELS_ROUTES);
 
 // ─── Remaining Next rewrites, via internal re-dispatch ──────────────────────
 async function redispatch(c, newPath) {

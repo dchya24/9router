@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 
 const KILO_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 
@@ -12,7 +11,7 @@ export async function GET() {
 
   // Return cached result if still valid
   if (cachedModels && now - cacheTimestamp < CACHE_TTL_MS) {
-    return NextResponse.json({ models: cachedModels, cached: true });
+    return Response.json({ models: cachedModels, cached: true });
   }
 
   try {
@@ -40,14 +39,14 @@ export async function GET() {
     cachedModels = freeModels;
     cacheTimestamp = now;
 
-    return NextResponse.json({ models: freeModels, cached: false });
+    return Response.json({ models: freeModels, cached: false });
   } catch (error) {
     // Return cached data if available, even if expired
     if (cachedModels) {
-      return NextResponse.json({ models: cachedModels, cached: true, warning: error.message });
+      return Response.json({ models: cachedModels, cached: true, warning: error.message });
     }
 
-    return NextResponse.json(
+    return Response.json(
       { models: [], error: `Failed to fetch Kilo models: ${error.message}` },
       { status: 502 }
     );
