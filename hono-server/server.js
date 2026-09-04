@@ -64,6 +64,9 @@ const apiMedia = loaderFor("media-providers");
 const apiTunnel = loaderFor("tunnel");
 const apiAuth = loaderFor("auth");
 const apiOauth = loaderFor("oauth");
+const apiCliTools = loaderFor("cli-tools");
+const apiShutdown = loaderFor("shutdown");
+const apiProviderNodes = loaderFor("provider-nodes");
 
 // Adapts a Next route handler to a Hono handler.
 // opts.catchAll: param name receiving path segments after catchAllPrefix.
@@ -414,6 +417,55 @@ register("/api", [
   // Generic OAuth flow: /api/oauth/{provider}/{action}
   ["GET", "/oauth/:provider/:action", () => apiOauth("/[provider]/[action]/route.js"), { params: ["provider", "action"] }],
   ["POST", "/oauth/:provider/:action", () => apiOauth("/[provider]/[action]/route.js"), { params: ["provider", "action"] }],
+]);
+
+// ─── Admin group: cli-tools (LAST batch — every /api route now lives here) ──
+// *-settings POST/DELETE write real tool config files on the host — registered
+// but never exercised in tests. antigravity-mitm + cowork-settings are
+// LOCAL_ONLY (guard gates them to CLI token or local+authed).
+register("/api", [
+  ["GET", "/cli-tools/all-statuses", () => apiCliTools("/all-statuses/route.js")],
+  ["GET", "/cli-tools/antigravity-mitm", () => apiCliTools("/antigravity-mitm/route.js")],
+  ["POST", "/cli-tools/antigravity-mitm", () => apiCliTools("/antigravity-mitm/route.js")],
+  ["DELETE", "/cli-tools/antigravity-mitm", () => apiCliTools("/antigravity-mitm/route.js")],
+  ["PATCH", "/cli-tools/antigravity-mitm", () => apiCliTools("/antigravity-mitm/route.js")],
+  ["GET", "/cli-tools/antigravity-mitm/alias", () => apiCliTools("/antigravity-mitm/alias/route.js")],
+  ["PUT", "/cli-tools/antigravity-mitm/alias", () => apiCliTools("/antigravity-mitm/alias/route.js")],
+  ["GET", "/cli-tools/cowork-mcp-registry", () => apiCliTools("/cowork-mcp-registry/route.js")],
+  ["POST", "/cli-tools/cowork-mcp-tools", () => apiCliTools("/cowork-mcp-tools/route.js")],
+]);
+const CLI_SETTINGS = [
+  ["claude-settings", ["GET", "POST", "DELETE"]],
+  ["cline-settings", ["GET", "POST", "DELETE"]],
+  ["codex-settings", ["GET", "POST", "DELETE"]],
+  ["copilot-settings", ["GET", "POST", "DELETE"]],
+  ["cowork-settings", ["GET", "POST", "DELETE"]],
+  ["deepseek-tui-settings", ["GET", "POST", "DELETE"]],
+  ["devin-settings", ["GET"]],
+  ["droid-settings", ["GET", "POST", "DELETE"]],
+  ["grok-build-settings", ["GET", "POST", "DELETE"]],
+  ["hermes-settings", ["GET", "POST", "DELETE"]],
+  ["jcode-settings", ["GET", "POST", "DELETE"]],
+  ["kilo-settings", ["GET", "POST", "DELETE"]],
+  ["openclaw-settings", ["GET", "POST", "DELETE"]],
+  ["opencode-settings", ["GET", "POST", "PATCH", "DELETE"]],
+];
+for (const [name, methods] of CLI_SETTINGS) {
+  for (const method of methods) {
+    register("/api", [[method, `/cli-tools/${name}`, () => apiCliTools(`/${name}/route.js`)]]);
+  }
+}
+
+// ─── ALWAYS_PROTECTED: kills the host process — never called in tests ──────
+register("/api", [["POST", "/shutdown", () => apiShutdown("/route.js")]]);
+
+// ─── Admin group: provider-nodes (validate is LOCAL_ONLY-guarded) ──────────
+register("/api", [
+  ["GET", "/provider-nodes", () => apiProviderNodes("/route.js")],
+  ["POST", "/provider-nodes", () => apiProviderNodes("/route.js")],
+  ["PUT", "/provider-nodes/:id", () => apiProviderNodes("/[id]/route.js"), { id: "id" }],
+  ["DELETE", "/provider-nodes/:id", () => apiProviderNodes("/[id]/route.js"), { id: "id" }],
+  ["POST", "/provider-nodes/validate", () => apiProviderNodes("/validate/route.js")],
 ]);
 
 // ─── Remaining Next rewrites, via internal re-dispatch ──────────────────────

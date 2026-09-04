@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
@@ -56,10 +55,10 @@ export async function GET() {
   try {
     const installed = await checkInstalled();
     if (!installed) {
-      return NextResponse.json({ installed: false, settings: null, message: "Cline CLI is not installed" });
+      return Response.json({ installed: false, settings: null, message: "Cline CLI is not installed" });
     }
     const globalState = await readJson(getGlobalStatePath());
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       settings: {
         actModeApiProvider: globalState?.actModeApiProvider,
@@ -72,7 +71,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error checking cline settings:", error);
-    return NextResponse.json({ error: "Failed to check cline settings" }, { status: 500 });
+    return Response.json({ error: "Failed to check cline settings" }, { status: 500 });
   }
 }
 
@@ -80,7 +79,7 @@ export async function POST(request) {
   try {
     const { baseUrl, apiKey, model } = await request.json();
     if (!baseUrl || !apiKey || !model) {
-      return NextResponse.json({ error: "baseUrl, apiKey and model are required" }, { status: 400 });
+      return Response.json({ error: "baseUrl, apiKey and model are required" }, { status: 400 });
     }
 
     await fs.mkdir(getDataDir(), { recursive: true });
@@ -100,10 +99,10 @@ export async function POST(request) {
     secrets.openAiApiKey = apiKey;
     await fs.writeFile(getSecretsPath(), JSON.stringify(secrets, null, 2));
 
-    return NextResponse.json({ success: true, message: "Cline settings applied successfully!", globalStatePath: getGlobalStatePath() });
+    return Response.json({ success: true, message: "Cline settings applied successfully!", globalStatePath: getGlobalStatePath() });
   } catch (error) {
     console.log("Error updating cline settings:", error);
-    return NextResponse.json({ error: "Failed to update cline settings" }, { status: 500 });
+    return Response.json({ error: "Failed to update cline settings" }, { status: 500 });
   }
 }
 
@@ -111,7 +110,7 @@ export async function DELETE() {
   try {
     const globalState = await readJson(getGlobalStatePath());
     if (!globalState) {
-      return NextResponse.json({ success: true, message: "No settings file to reset" });
+      return Response.json({ success: true, message: "No settings file to reset" });
     }
 
     if (globalState.actModeApiProvider === "openai") {
@@ -127,9 +126,9 @@ export async function DELETE() {
     delete secrets.openAiApiKey;
     await fs.writeFile(getSecretsPath(), JSON.stringify(secrets, null, 2));
 
-    return NextResponse.json({ success: true, message: "9Router settings removed from Cline" });
+    return Response.json({ success: true, message: "9Router settings removed from Cline" });
   } catch (error) {
     console.log("Error resetting cline settings:", error);
-    return NextResponse.json({ error: "Failed to reset cline settings" }, { status: 500 });
+    return Response.json({ error: "Failed to reset cline settings" }, { status: 500 });
   }
 }

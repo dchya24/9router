@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { assertPublicUrl } from "@/shared/utils/ssrfGuard.js";
 import { isLocalRequest } from "@/dashboardGuard";
 
@@ -58,12 +57,12 @@ export async function POST(request) {
     const { baseUrl, apiKey, type, modelId } = body;
 
     if (!baseUrl || !apiKey) {
-      return NextResponse.json({ error: "Base URL and API key required" }, { status: 400 });
+      return Response.json({ error: "Base URL and API key required" }, { status: 400 });
     }
 
     // Validate URL format
     if (!isValidUrl(baseUrl)) {
-      return NextResponse.json({ error: "Invalid URL format" }, { status: 400 });
+      return Response.json({ error: "Invalid URL format" }, { status: 400 });
     }
 
     // SSRF guard for remote callers; local host keeps self-hosted nodes (e.g. ollama-local)
@@ -71,7 +70,7 @@ export async function POST(request) {
       try {
         assertPublicUrl(baseUrl);
       } catch {
-        return NextResponse.json({ error: "URL not allowed" }, { status: 400 });
+        return Response.json({ error: "URL not allowed" }, { status: 400 });
       }
     }
 
@@ -79,7 +78,7 @@ export async function POST(request) {
     if (type === "custom-embedding") {
       const normalizedBase = baseUrl.trim().replace(/\/$/, "");
       if (!modelId?.trim()) {
-        return NextResponse.json({ valid: false, error: "Model ID required for embedding validation" });
+        return Response.json({ valid: false, error: "Model ID required for embedding validation" });
       }
       const embedRes = await fetchWithTimeout(`${normalizedBase}/embeddings`, {
         method: "POST",
@@ -92,13 +91,13 @@ export async function POST(request) {
       if (embedRes.ok) {
         const data = await embedRes.json().catch(() => null);
         const dims = Array.isArray(data?.data?.[0]?.embedding) ? data.data[0].embedding.length : null;
-        return NextResponse.json({ valid: true, method: "embeddings", dimensions: dims });
+        return Response.json({ valid: true, method: "embeddings", dimensions: dims });
       }
       if (embedRes.status === 401 || embedRes.status === 403) {
-        return NextResponse.json({ valid: false, error: "API key unauthorized" });
+        return Response.json({ valid: false, error: "API key unauthorized" });
       }
       const errBody = await embedRes.text().catch(() => "");
-      return NextResponse.json({
+      return Response.json({
         valid: false,
         error: `Embeddings request failed (${embedRes.status})${errBody ? `: ${errBody.slice(0, 200)}` : ""}`,
         method: "embeddings"
@@ -122,11 +121,11 @@ export async function POST(request) {
         }
       });
 
-      if (res.ok) return NextResponse.json({ valid: true });
+      if (res.ok) return Response.json({ valid: true });
 
       // Auth errors - no point trying chat fallback
       if (res.status === 401 || res.status === 403) {
-        return NextResponse.json({ valid: false, error: "API key unauthorized" });
+        return Response.json({ valid: false, error: "API key unauthorized" });
       }
 
       // Fallback: try chat/completions if modelId provided
@@ -146,16 +145,16 @@ export async function POST(request) {
           })
         });
         if (chatRes.ok) {
-          return NextResponse.json({ valid: true, method: "chat" });
+          return Response.json({ valid: true, method: "chat" });
         }
-        return NextResponse.json({
+        return Response.json({
           valid: false,
           error: getChatErrorMessage(chatRes.status),
           method: "chat"
         });
       }
 
-      return NextResponse.json({ valid: false, error: getModelsErrorMessage(res.status) });
+      return Response.json({ valid: false, error: getModelsErrorMessage(res.status) });
     }
 
     // OpenAI Compatible Validation (Default)
@@ -164,11 +163,11 @@ export async function POST(request) {
       headers: { "Authorization": `Bearer ${apiKey}` },
     });
 
-    if (res.ok) return NextResponse.json({ valid: true });
+    if (res.ok) return Response.json({ valid: true });
 
     // Auth errors - no point trying chat fallback
     if (res.status === 401 || res.status === 403) {
-      return NextResponse.json({ valid: false, error: "API key unauthorized" });
+      return Response.json({ valid: false, error: "API key unauthorized" });
     }
 
     // Fallback: try chat/completions if modelId provided
@@ -186,16 +185,16 @@ export async function POST(request) {
         })
       });
       if (chatRes.ok) {
-        return NextResponse.json({ valid: true, method: "chat" });
+        return Response.json({ valid: true, method: "chat" });
       }
-      return NextResponse.json({
+      return Response.json({
         valid: false,
         error: getChatErrorMessage(chatRes.status),
         method: "chat"
       });
     }
 
-    return NextResponse.json({ valid: false, error: getModelsErrorMessage(res.status) });
+    return Response.json({ valid: false, error: getModelsErrorMessage(res.status) });
   } catch (error) {
     const errorMessage = getErrorMessage(error);
     console.error("Error validating provider node:", {
@@ -204,7 +203,7 @@ export async function POST(request) {
       code: error.cause?.code,
       userMessage: errorMessage
     });
-    return NextResponse.json({ 
+    return Response.json({ 
       valid: false,
       error: errorMessage 
     }, { status: 500 });

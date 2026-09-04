@@ -1,7 +1,9 @@
 # Hono Migration Plan — Proxy API on bare Node
 
-_Status: Phase 2 spike validated; Phase 3 started — `usage` group migrated,
-security middleware ported, front-proxy mode working (2026-09-04)._
+_Status: **Phase 3 complete (2026-09-04)** — every route under `src/app/api/**`
+(154 files: 23 proxy-surface + 131 admin) is served by the Hono server; Next
+only serves dashboard pages/static assets via the front-proxy. Next up:
+Phase 3.5/4 review, then dashboard static export + decommission Next._
 
 ## Goal
 
@@ -107,7 +109,7 @@ Run: `npm run hono:start` (default port 20127; `PORT`/`HOST` env). Shares the
 same `DATA_DIR`/SQLite DB as Next, so both servers can run side by side during
 migration. `package.json` adds `hono` + `@hono/node-server` deps only.
 
-### 🚧 Phase 3 — Admin API groups onto Hono (in progress)
+### 🚧→✅ Phase 3 — Admin API groups onto Hono (COMPLETE)
 Migrate dashboard API groups one at a time, cheapest first:
 `usage` → `providers`/`models` → `cli-tools` → `proxy-pools`/`settings`/combos/keys.
 
@@ -130,12 +132,13 @@ APIs, dashboard pages, static assets) to the Next standalone instance on a
 private port, with undici's stale `content-encoding`/`content-length` headers
 stripped. Next's own middleware re-validates proxied requests.
 
-**Groups migrated — `usage` (10), `providers` (10), `models` (7), `keys` (2),
-`combos` (2), `proxy-pools` (6), `settings` (4), `version` (3), `pricing` (1),
-`tags` (1), `init` (1), `health` (1), `locale` (1), `translator` (6),
-`mcp` (2), `pxpipe` (8), `headroom` (6), `media-providers` (5),
-`tunnel` (7), `auth` (11), `oauth` (14) = 107 admin routes** (all but
-`cli-tools` + `shutdown`).
+**Groups migrated — ALL of them (Phase 3 complete).** `usage` (10),
+`providers` (10), `models` (7), `keys` (2), `combos` (2), `proxy-pools` (6),
+`settings` (4), `version` (3), `pricing` (1), `tags` (1), `init` (1),
+`health` (1), `locale` (1), `translator` (6), `mcp` (2), `pxpipe` (8),
+`headroom` (6), `media-providers` (5), `tunnel` (7), `auth` (11), `oauth` (14),
+`cli-tools` (19), `shutdown` (1), `provider-nodes` (3) = **131 admin routes**,
+on top of the 23-route proxy surface.
 
 **Auth cookie flows — done via a `next/headers` shim.** Route files keep their
 `import { cookies } from "next/headers"` untouched; the alias loader maps it

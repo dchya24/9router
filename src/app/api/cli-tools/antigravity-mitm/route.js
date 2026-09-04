@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   getMitmStatus,
   startServer,
@@ -70,7 +69,7 @@ export async function GET() {
     const status = await getMitmStatus();
     const settings = await getSettings();
     const hasCachedPassword = !!getCachedPassword() || !!(await loadEncryptedPassword());
-    return NextResponse.json({
+    return Response.json({
       running: status.running,
       pid: status.pid || null,
       certExists: status.certExists || false,
@@ -86,7 +85,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error getting MITM status:", error.message);
-    return NextResponse.json({ error: "Failed to get MITM status" }, { status: 500 });
+    return Response.json({ error: "Failed to get MITM status" }, { status: 500 });
   }
 }
 
@@ -97,14 +96,14 @@ export async function POST(request) {
     const pwd = getPassword(sudoPassword) || await loadEncryptedPassword() || "";
 
     if (!apiKey || requiresSudoPassword(pwd)) {
-      return NextResponse.json(
+      return Response.json(
         { error: !apiKey ? "Missing apiKey" : "Missing sudoPassword" },
         { status: 400 }
       );
     }
 
     if (!checkPrivilege(pwd)) {
-      return NextResponse.json(
+      return Response.json(
         { error: isWin ? "Administrator required — restart 9Router as Administrator" : "Root or sudo password required to start MITM" },
         { status: 403 }
       );
@@ -115,7 +114,7 @@ export async function POST(request) {
         const normalized = normalizeMitmRouterBaseUrlInput(mitmRouterBaseUrl);
         await updateSettings({ mitmRouterBaseUrl: normalized });
       } catch (e) {
-        return NextResponse.json(
+        return Response.json(
           { error: e.message || "Invalid MITM router URL" },
           { status: 400 },
         );
@@ -125,16 +124,16 @@ export async function POST(request) {
     const result = await startServer(apiKey, pwd, !!forceKillPort443);
     if (!isWin) setCachedPassword(pwd);
 
-    return NextResponse.json({ success: true, running: result.running, pid: result.pid });
+    return Response.json({ success: true, running: result.running, pid: result.pid });
   } catch (error) {
     console.log("Error starting MITM server:", error.message);
     if (error.code === "PORT_443_BUSY") {
-      return NextResponse.json(
+      return Response.json(
         { error: error.message, code: "PORT_443_BUSY", portOwner: error.portOwner },
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: error.message || "Failed to start MITM server" }, { status: 500 });
+    return Response.json({ error: error.message || "Failed to start MITM server" }, { status: 500 });
   }
 }
 
@@ -146,16 +145,16 @@ export async function DELETE(request) {
     const pwd = getPassword(sudoPassword) || await loadEncryptedPassword() || "";
 
     if (requiresSudoPassword(pwd)) {
-      return NextResponse.json({ error: "Missing sudoPassword" }, { status: 400 });
+      return Response.json({ error: "Missing sudoPassword" }, { status: 400 });
     }
 
     await stopServer(pwd);
     if (!isWin && sudoPassword) setCachedPassword(sudoPassword);
 
-    return NextResponse.json({ success: true, running: false });
+    return Response.json({ success: true, running: false });
   } catch (error) {
     console.log("Error stopping MITM server:", error.message);
-    return NextResponse.json({ error: error.message || "Failed to stop MITM server" }, { status: 500 });
+    return Response.json({ error: error.message || "Failed to stop MITM server" }, { status: 500 });
   }
 }
 
@@ -166,13 +165,13 @@ export async function PATCH(request) {
     const pwd = getPassword(sudoPassword) || await loadEncryptedPassword() || "";
 
     if (!tool || !action) {
-      return NextResponse.json({ error: "tool and action required" }, { status: 400 });
+      return Response.json({ error: "tool and action required" }, { status: 400 });
     }
     if (requiresSudoPassword(pwd)) {
-      return NextResponse.json({ error: "Missing sudoPassword" }, { status: 400 });
+      return Response.json({ error: "Missing sudoPassword" }, { status: 400 });
     }
     if (!checkPrivilege(pwd)) {
-      return NextResponse.json(
+      return Response.json(
         { error: isWin ? "Administrator required — restart 9Router as Administrator" : "Root or sudo password required to modify DNS" },
         { status: 403 }
       );
@@ -186,17 +185,17 @@ export async function PATCH(request) {
       await trustCert(pwd);
       if (!isWin && sudoPassword) setCachedPassword(sudoPassword);
       const status = await getMitmStatus();
-      return NextResponse.json({ success: true, certTrusted: status.certTrusted });
+      return Response.json({ success: true, certTrusted: status.certTrusted });
     } else {
-      return NextResponse.json({ error: "action must be enable, disable, or trust-cert" }, { status: 400 });
+      return Response.json({ error: "action must be enable, disable, or trust-cert" }, { status: 400 });
     }
 
     if (!isWin && sudoPassword) setCachedPassword(sudoPassword);
 
     const status = await getMitmStatus();
-    return NextResponse.json({ success: true, dnsStatus: status.dnsStatus });
+    return Response.json({ success: true, dnsStatus: status.dnsStatus });
   } catch (error) {
     console.log("Error toggling DNS:", error.message);
-    return NextResponse.json({ error: error.message || "Failed to toggle DNS" }, { status: 500 });
+    return Response.json({ error: error.message || "Failed to toggle DNS" }, { status: 500 });
   }
 }

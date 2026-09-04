@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
@@ -81,7 +80,7 @@ export async function GET() {
     const isInstalled = await checkOpenClawInstalled();
     
     if (!isInstalled) {
-      return NextResponse.json({
+      return Response.json({
         installed: false,
         settings: null,
         message: "Open Claw CLI is not installed",
@@ -101,7 +100,7 @@ export async function GET() {
       })
     );
 
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       settings,
       agents: enrichedAgents,
@@ -110,7 +109,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error checking openclaw settings:", error);
-    return NextResponse.json({ error: "Failed to check openclaw settings" }, { status: 500 });
+    return Response.json({ error: "Failed to check openclaw settings" }, { status: 500 });
   }
 }
 
@@ -141,7 +140,7 @@ export async function POST(request) {
     const { baseUrl, apiKey, model, agentModels = {} } = await request.json();
     
     if (!baseUrl || !model) {
-      return NextResponse.json({ error: "baseUrl and model are required" }, { status: 400 });
+      return Response.json({ error: "baseUrl and model are required" }, { status: 400 });
     }
 
     const openclawDir = getOpenClawDir();
@@ -223,14 +222,14 @@ export async function POST(request) {
 
     await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2));
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "Open Claw settings applied successfully!",
       settingsPath,
     });
   } catch (error) {
     console.log("Error updating openclaw settings:", error);
-    return NextResponse.json({ error: "Failed to update openclaw settings" }, { status: 500 });
+    return Response.json({ error: "Failed to update openclaw settings" }, { status: 500 });
   }
 }
 
@@ -246,7 +245,7 @@ export async function DELETE() {
       settings = JSON.parse(existingSettings);
     } catch (error) {
       if (error.code === "ENOENT") {
-        return NextResponse.json({
+        return Response.json({
           success: true,
           message: "No settings file to reset",
         });
@@ -283,12 +282,12 @@ export async function DELETE() {
     // Write updated settings
     await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2));
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "9Router settings removed successfully",
     });
   } catch (error) {
     console.log("Error resetting openclaw settings:", error);
-    return NextResponse.json({ error: "Failed to reset openclaw settings" }, { status: 500 });
+    return Response.json({ error: "Failed to reset openclaw settings" }, { status: 500 });
   }
 }

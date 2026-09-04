@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
@@ -68,14 +67,14 @@ export async function GET() {
   try {
     const { installed, source } = await checkDevinInstalled();
     if (!installed) {
-      return NextResponse.json({
+      return Response.json({
         installed: false,
         message: "Devin CLI is not installed. Install it from https://cli.devin.ai and run `devin auth login`.",
         installUrl: "https://cli.devin.ai",
       });
     }
     const version = await readDevinVersion();
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       source,
       version,
@@ -83,6 +82,6 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error checking devin settings:", error);
-    return NextResponse.json({ error: "Failed to check devin settings" }, { status: 500 });
+    return Response.json({ error: "Failed to check devin settings" }, { status: 500 });
   }
 }

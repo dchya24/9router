@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { GET as claudeGet } from "../claude-settings/route";
 import { GET as codexGet } from "../codex-settings/route";
 import { GET as opencodeGet } from "../opencode-settings/route";
@@ -46,5 +45,5 @@ export async function GET() {
       }
     })
   );
-  return NextResponse.json(Object.fromEntries(entries));
+  return Response.json(Object.fromEntries(entries));
 }

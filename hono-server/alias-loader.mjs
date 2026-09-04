@@ -48,5 +48,17 @@ export async function resolve(specifier, context, nextResolve) {
     }
     return nextResolve(pathToFileURL(candidate).href, context);
   }
+  // Extensionless relative imports (e.g. all-statuses importing
+  // "./claude-settings/route") — strict ESM needs extensions; retry candidates.
+  if ((specifier.startsWith("./") || specifier.startsWith("../")) && context.parentURL?.startsWith("file:")) {
+    try {
+      return await nextResolve(specifier, context);
+    } catch (e) {
+      const base = path.resolve(path.dirname(fileURLToPath(context.parentURL)), specifier);
+      if (existsSync(base + ".js")) return nextResolve(pathToFileURL(base + ".js").href, context);
+      if (existsSync(path.join(base, "index.js"))) return nextResolve(pathToFileURL(path.join(base, "index.js")).href, context);
+      throw e;
+    }
+  }
   return nextResolve(specifier, context);
 }

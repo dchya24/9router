@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createProviderNode, getProviderNodes } from "@/models";
 import { OPENAI_COMPATIBLE_PREFIX, ANTHROPIC_COMPATIBLE_PREFIX, CUSTOM_EMBEDDING_PREFIX } from "@/shared/constants/providers";
 import { generateId } from "@/shared/utils";
@@ -21,10 +20,10 @@ const CUSTOM_EMBEDDING_DEFAULTS = {
 export async function GET() {
   try {
     const nodes = await getProviderNodes();
-    return NextResponse.json({ nodes });
+    return Response.json({ nodes });
   } catch (error) {
     console.log("Error fetching provider nodes:", error);
-    return NextResponse.json({ error: "Failed to fetch provider nodes" }, { status: 500 });
+    return Response.json({ error: "Failed to fetch provider nodes" }, { status: 500 });
   }
 }
 
@@ -35,11 +34,11 @@ export async function POST(request) {
     const { name, prefix, apiType, baseUrl, type } = body;
 
     if (!name?.trim()) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+      return Response.json({ error: "Name is required" }, { status: 400 });
     }
 
     if (!prefix?.trim()) {
-      return NextResponse.json({ error: "Prefix is required" }, { status: 400 });
+      return Response.json({ error: "Prefix is required" }, { status: 400 });
     }
 
     // Determine type
@@ -47,7 +46,7 @@ export async function POST(request) {
 
     if (nodeType === "openai-compatible") {
       if (!apiType || !["chat", "responses"].includes(apiType)) {
-        return NextResponse.json({ error: "Invalid OpenAI compatible API type" }, { status: 400 });
+        return Response.json({ error: "Invalid OpenAI compatible API type" }, { status: 400 });
       }
 
       const node = await createProviderNode({
@@ -58,7 +57,7 @@ export async function POST(request) {
         baseUrl: (baseUrl || OPENAI_COMPATIBLE_DEFAULTS.baseUrl).trim(),
         name: name.trim(),
       });
-      return NextResponse.json({ node }, { status: 201 });
+      return Response.json({ node }, { status: 201 });
     }
 
     if (nodeType === "custom-embedding") {
@@ -75,7 +74,7 @@ export async function POST(request) {
         baseUrl: sanitizedBaseUrl,
         name: name.trim(),
       });
-      return NextResponse.json({ node }, { status: 201 });
+      return Response.json({ node }, { status: 201 });
     }
 
     if (nodeType === "anthropic-compatible") {
@@ -93,12 +92,12 @@ export async function POST(request) {
         baseUrl: sanitizedBaseUrl,
         name: name.trim(),
       });
-      return NextResponse.json({ node }, { status: 201 });
+      return Response.json({ node }, { status: 201 });
     }
 
-    return NextResponse.json({ error: "Invalid provider node type" }, { status: 400 });
+    return Response.json({ error: "Invalid provider node type" }, { status: 400 });
   } catch (error) {
     console.log("Error creating provider node:", error);
-    return NextResponse.json({ error: "Failed to create provider node" }, { status: 500 });
+    return Response.json({ error: "Failed to create provider node" }, { status: 500 });
   }
 }

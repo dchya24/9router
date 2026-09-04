@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -46,7 +45,7 @@ export async function GET() {
     const config = await readConfig();
     const entry = get9RouterEntry(config);
 
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       config,
       has9Router: has9RouterConfig(config),
@@ -56,7 +55,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error checking copilot settings:", error);
-    return NextResponse.json({ error: "Failed to check copilot settings" }, { status: 500 });
+    return Response.json({ error: "Failed to check copilot settings" }, { status: 500 });
   }
 }
 
@@ -66,7 +65,7 @@ export async function POST(request) {
     const { baseUrl, apiKey, models } = await request.json();
 
     if (!baseUrl || !models?.length) {
-      return NextResponse.json({ error: "baseUrl and models are required" }, { status: 400 });
+      return Response.json({ error: "baseUrl and models are required" }, { status: 400 });
     }
 
     const configPath = getConfigPath();
@@ -108,14 +107,14 @@ export async function POST(request) {
 
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "Copilot settings applied! Reload VS Code to take effect.",
       configPath,
     });
   } catch (error) {
     console.log("Error updating copilot settings:", error);
-    return NextResponse.json({ error: "Failed to update copilot settings" }, { status: 500 });
+    return Response.json({ error: "Failed to update copilot settings" }, { status: 500 });
   }
 }
 
@@ -131,7 +130,7 @@ export async function DELETE() {
       config = Array.isArray(parsed) ? parsed : [];
     } catch (error) {
       if (error.code === "ENOENT") {
-        return NextResponse.json({ success: true, message: "No config file to reset" });
+        return Response.json({ success: true, message: "No config file to reset" });
       }
       throw error;
     }
@@ -139,12 +138,12 @@ export async function DELETE() {
     config = config.filter((e) => e.name !== "9Router");
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "9Router removed from Copilot config",
     });
   } catch (error) {
     console.log("Error resetting copilot settings:", error);
-    return NextResponse.json({ error: "Failed to reset copilot settings" }, { status: 500 });
+    return Response.json({ error: "Failed to reset copilot settings" }, { status: 500 });
   }
 }

@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
@@ -106,11 +105,11 @@ export async function GET() {
     try {
         const installed = await checkDeepSeekInstalled();
         if (!installed) {
-            return NextResponse.json({ installed: false, settings: null, message: "DeepSeek TUI is not installed" });
+            return Response.json({ installed: false, settings: null, message: "DeepSeek TUI is not installed" });
         }
         const toml = await readConfigToml();
         const config = parseToml(toml);
-        return NextResponse.json({
+        return Response.json({
             installed: true,
             settings: config,
             has9Router: has9RouterConfig(config),
@@ -118,7 +117,7 @@ export async function GET() {
         });
     } catch (error) {
         console.log("Error checking deepseek-tui settings:", error);
-        return NextResponse.json({ error: "Failed to check deepseek-tui settings" }, { status: 500 });
+        return Response.json({ error: "Failed to check deepseek-tui settings" }, { status: 500 });
     }
 }
 
@@ -126,7 +125,7 @@ export async function POST(request) {
     try {
         const { baseUrl, apiKey, model } = await request.json();
         if (!baseUrl || !model) {
-            return NextResponse.json({ error: "baseUrl and model are required" }, { status: 400 });
+            return Response.json({ error: "baseUrl and model are required" }, { status: 400 });
         }
 
         const dir = getDeepSeekDir();
@@ -135,14 +134,14 @@ export async function POST(request) {
         const newConfig = build9RouterConfig(baseUrl, apiKey || "sk_9router", model);
         await fs.writeFile(getDeepSeekConfigPath(), newConfig);
 
-        return NextResponse.json({
+        return Response.json({
             success: true,
             message: "DeepSeek TUI settings applied successfully!",
             configPath: getDeepSeekConfigPath(),
         });
     } catch (error) {
         console.log("Error updating deepseek-tui settings:", error);
-        return NextResponse.json({ error: "Failed to update deepseek-tui settings" }, { status: 500 });
+        return Response.json({ error: "Failed to update deepseek-tui settings" }, { status: 500 });
     }
 }
 
@@ -152,13 +151,13 @@ export async function DELETE() {
         try {
             await fs.access(configPath);
         } catch {
-            return NextResponse.json({ success: true, message: "No config file to reset" });
+            return Response.json({ success: true, message: "No config file to reset" });
         }
 
         await fs.writeFile(configPath, DEFAULT_CONFIG);
-        return NextResponse.json({ success: true, message: `${PROVIDER_NAME} config reset to DeepSeek defaults` });
+        return Response.json({ success: true, message: `${PROVIDER_NAME} config reset to DeepSeek defaults` });
     } catch (error) {
         console.log("Error resetting deepseek-tui settings:", error);
-        return NextResponse.json({ error: "Failed to reset deepseek-tui settings" }, { status: 500 });
+        return Response.json({ error: "Failed to reset deepseek-tui settings" }, { status: 500 });
     }
 }

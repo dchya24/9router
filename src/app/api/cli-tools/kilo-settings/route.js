@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
@@ -56,10 +55,10 @@ export async function GET() {
   try {
     const installed = await checkInstalled();
     if (!installed) {
-      return NextResponse.json({ installed: false, settings: null, message: "Kilo Code CLI is not installed" });
+      return Response.json({ installed: false, settings: null, message: "Kilo Code CLI is not installed" });
     }
     const auth = await readJson(getAuthPath());
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       settings: { auth: auth ? Object.keys(auth) : [] },
       has9Router: has9RouterConfig(auth),
@@ -67,7 +66,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error checking kilo settings:", error);
-    return NextResponse.json({ error: "Failed to check kilo settings" }, { status: 500 });
+    return Response.json({ error: "Failed to check kilo settings" }, { status: 500 });
   }
 }
 
@@ -75,7 +74,7 @@ export async function POST(request) {
   try {
     const { baseUrl, apiKey, model } = await request.json();
     if (!baseUrl || !apiKey || !model) {
-      return NextResponse.json({ error: "baseUrl, apiKey and model are required" }, { status: 400 });
+      return Response.json({ error: "baseUrl, apiKey and model are required" }, { status: 400 });
     }
 
     await fs.mkdir(getDataDir(), { recursive: true });
@@ -99,10 +98,10 @@ export async function POST(request) {
       await fs.writeFile(getVscodeSettingsPath(), JSON.stringify(vscode, null, 2));
     } catch { /* VS Code settings not writable */ }
 
-    return NextResponse.json({ success: true, message: "Kilo Code settings applied successfully!", authPath: getAuthPath() });
+    return Response.json({ success: true, message: "Kilo Code settings applied successfully!", authPath: getAuthPath() });
   } catch (error) {
     console.log("Error updating kilo settings:", error);
-    return NextResponse.json({ error: "Failed to update kilo settings" }, { status: 500 });
+    return Response.json({ error: "Failed to update kilo settings" }, { status: 500 });
   }
 }
 
@@ -110,7 +109,7 @@ export async function DELETE() {
   try {
     const auth = await readJson(getAuthPath());
     if (!auth) {
-      return NextResponse.json({ success: true, message: "No settings file to reset" });
+      return Response.json({ success: true, message: "No settings file to reset" });
     }
     delete auth["openai-compatible"];
     delete auth["9router"];
@@ -125,9 +124,9 @@ export async function DELETE() {
       }
     } catch { /* ignore */ }
 
-    return NextResponse.json({ success: true, message: "9Router settings removed from Kilo Code" });
+    return Response.json({ success: true, message: "9Router settings removed from Kilo Code" });
   } catch (error) {
     console.log("Error resetting kilo settings:", error);
-    return NextResponse.json({ error: "Failed to reset kilo settings" }, { status: 500 });
+    return Response.json({ error: "Failed to reset kilo settings" }, { status: 500 });
   }
 }

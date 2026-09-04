@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -245,7 +244,7 @@ export async function GET() {
   try {
     const installed = await checkInstalled();
     if (!installed) {
-      return NextResponse.json({ installed: false, config: null, message: "Claude Desktop (Cowork mode) not detected" });
+      return Response.json({ installed: false, config: null, message: "Claude Desktop (Cowork mode) not detected" });
     }
     const meta = await readJson(await getMetaPath());
     const appliedId = meta?.appliedId || null;
@@ -271,7 +270,7 @@ export async function GET() {
       .filter((m) => m.custom || (!stdioNames.has(m.name) && typeof m.url === "string" && m.url.includes("/api/mcp/")))
       .map((m) => ({ name: m.name, url: m.url, transport: m.transport, custom: true }));
 
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       config,
       has9Router,
@@ -304,7 +303,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error reading cowork settings:", error);
-    return NextResponse.json({ error: "Failed to read cowork settings" }, { status: 500 });
+    return Response.json({ error: "Failed to read cowork settings" }, { status: 500 });
   }
 }
 
@@ -313,11 +312,11 @@ export async function POST(request) {
     const { baseUrl, apiKey, models, plugins, localPlugins, customPlugins } = await request.json();
 
     if (!baseUrl || !apiKey) {
-      return NextResponse.json({ error: "baseUrl and apiKey are required" }, { status: 400 });
+      return Response.json({ error: "baseUrl and apiKey are required" }, { status: 400 });
     }
     const modelsArray = Array.isArray(models) ? models.filter((m) => typeof m === "string" && m.trim()) : [];
     if (modelsArray.length === 0) {
-      return NextResponse.json({ error: "At least one model is required" }, { status: 400 });
+      return Response.json({ error: "At least one model is required" }, { status: 400 });
     }
 
     // Respect empty array (user toggled all off); fallback to defaults only when undefined.
@@ -352,7 +351,7 @@ export async function POST(request) {
     let localMcpResult = { applied: localPluginNames, via: "3p-sse-bridge" };
     try { await cleanup1pLegacy(); } catch { /* ignore */ }
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       bootstrapped,
       message: bootstrapped
@@ -364,7 +363,7 @@ export async function POST(request) {
     });
   } catch (error) {
     console.log("Error applying cowork settings:", error);
-    return NextResponse.json({ error: "Failed to apply cowork settings" }, { status: 500 });
+    return Response.json({ error: "Failed to apply cowork settings" }, { status: 500 });
   }
 }
 
@@ -372,16 +371,16 @@ export async function DELETE() {
   try {
     const meta = await readJson(await getMetaPath());
     if (!meta?.appliedId) {
-      return NextResponse.json({ success: true, message: "No active config to reset" });
+      return Response.json({ success: true, message: "No active config to reset" });
     }
     const configPath = path.join(await getConfigDir(), `${meta.appliedId}.json`);
     try { await fs.writeFile(configPath, JSON.stringify({}, null, 2)); }
     catch (error) { if (error.code !== "ENOENT") throw error; }
     try { await writeSkipApprovals([]); } catch { /* ignore */ }
     try { await cleanup1pLegacy(); } catch { /* ignore */ }
-    return NextResponse.json({ success: true, message: "Cowork config reset" });
+    return Response.json({ success: true, message: "Cowork config reset" });
   } catch (error) {
     console.log("Error resetting cowork settings:", error);
-    return NextResponse.json({ error: "Failed to reset cowork settings" }, { status: 500 });
+    return Response.json({ error: "Failed to reset cowork settings" }, { status: 500 });
   }
 }

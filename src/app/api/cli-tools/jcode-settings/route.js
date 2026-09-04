@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -111,7 +110,7 @@ export async function GET() {
   const isInstalled = await checkJcodeInstalled();
 
   if (!isInstalled) {
-    return NextResponse.json({
+    return Response.json({
       installed: false,
       message: "jcode not installed. Install via: curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.sh | bash",
     });
@@ -120,7 +119,7 @@ export async function GET() {
   const config = await readConfig();
   const has9Router = has9RouterConfig(config);
 
-  return NextResponse.json({
+  return Response.json({
     installed: true,
     config,
     has9Router,
@@ -133,7 +132,7 @@ export async function POST(request) {
     const { baseUrl, apiKey, models } = await request.json();
 
     if (!baseUrl || !apiKey) {
-      return NextResponse.json(
+      return Response.json(
         { error: "baseUrl and apiKey are required" },
         { status: 400 }
       );
@@ -172,14 +171,14 @@ export async function POST(request) {
     env.JCODE_9ROUTER_API_KEY = apiKey;
     await writeProviderEnv(env);
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "jcode configured successfully. Use: jcode --provider-profile 9router",
       configPath: getConfigPath(),
     });
   } catch (error) {
     console.error("Error configuring jcode:", error);
-    return NextResponse.json(
+    return Response.json(
       { error: error.message },
       { status: 500 }
     );
@@ -191,7 +190,7 @@ export async function DELETE() {
     const config = await readConfig();
 
     if (!config.providers) {
-      return NextResponse.json({ success: true, message: "No configuration to remove" });
+      return Response.json({ success: true, message: "No configuration to remove" });
     }
 
     delete config.providers["9router"];
@@ -202,13 +201,13 @@ export async function DELETE() {
     delete env.JCODE_9ROUTER_API_KEY;
     await writeProviderEnv(env);
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "9router configuration removed from jcode",
     });
   } catch (error) {
     console.error("Error removing jcode configuration:", error);
-    return NextResponse.json(
+    return Response.json(
       { error: error.message },
       { status: 500 }
     );

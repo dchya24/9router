@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 
 const REGISTRY_URL = "https://api.anthropic.com/mcp-registry/v0/servers";
 const VISIBILITY = "commercial,gsuite,gsuite-google";
@@ -63,15 +62,15 @@ export async function GET(request) {
   const force = searchParams.get("refresh") === "1";
   const cache = gcache();
   if (!force && cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
-    return NextResponse.json({ cached: true, ...cache.data });
+    return Response.json({ cached: true, ...cache.data });
   }
   try {
     const servers = await fetchAll();
     const data = { servers, total: servers.length };
     cache.ts = Date.now();
     cache.data = data;
-    return NextResponse.json({ cached: false, ...data });
+    return Response.json({ cached: false, ...data });
   } catch (e) {
-    return NextResponse.json({ error: e.message, servers: [], total: 0 }, { status: 500 });
+    return Response.json({ error: e.message, servers: [], total: 0 }, { status: 500 });
   }
 }

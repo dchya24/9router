@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { getMitmAlias, setMitmAliasAll } from "@/models";
 import { getMitmStatus } from "@/mitm/manager";
 import { writeAliasForTool } from "@/lib/mitmAliasCache";
@@ -11,10 +10,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const toolName = searchParams.get("tool");
     const aliases = await getMitmAlias(toolName || undefined);
-    return NextResponse.json({ aliases });
+    return Response.json({ aliases });
   } catch (error) {
     console.log("Error fetching MITM aliases:", error.message);
-    return NextResponse.json({ error: "Failed to fetch aliases" }, { status: 500 });
+    return Response.json({ error: "Failed to fetch aliases" }, { status: 500 });
   }
 }
 
@@ -24,13 +23,13 @@ export async function PUT(request) {
     const { tool, mappings } = await request.json();
 
     if (!tool || !mappings || typeof mappings !== "object") {
-      return NextResponse.json({ error: "tool and mappings required" }, { status: 400 });
+      return Response.json({ error: "tool and mappings required" }, { status: 400 });
     }
 
     // Check if DNS is enabled for this tool
     const status = await getMitmStatus();
     if (!status.dnsStatus || !status.dnsStatus[tool]) {
-      return NextResponse.json(
+      return Response.json(
         { error: `DNS must be enabled for ${tool} before editing model mappings` },
         { status: 403 }
       );
@@ -45,9 +44,9 @@ export async function PUT(request) {
 
     await setMitmAliasAll(tool, filtered);
     writeAliasForTool(tool, filtered);
-    return NextResponse.json({ success: true, aliases: filtered });
+    return Response.json({ success: true, aliases: filtered });
   } catch (error) {
     console.log("Error saving MITM aliases:", error.message);
-    return NextResponse.json({ error: "Failed to save aliases" }, { status: 500 });
+    return Response.json({ error: "Failed to save aliases" }, { status: 500 });
   }
 }

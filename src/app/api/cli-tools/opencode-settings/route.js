@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
@@ -59,7 +58,7 @@ export async function GET() {
     const isInstalled = await checkOpenCodeInstalled();
 
     if (!isInstalled) {
-      return NextResponse.json({
+      return Response.json({
         installed: false,
         config: null,
         message: "OpenCode CLI is not installed",
@@ -70,7 +69,7 @@ export async function GET() {
     const providerConfig = config?.provider?.["9router"];
     const modelMap = providerConfig?.models || {};
 
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       config,
       has9Router: has9RouterConfig(config),
@@ -83,7 +82,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error checking opencode settings:", error);
-    return NextResponse.json({ error: "Failed to check opencode settings" }, { status: 500 });
+    return Response.json({ error: "Failed to check opencode settings" }, { status: 500 });
   }
 }
 
@@ -96,7 +95,7 @@ export async function POST(request) {
     const modelsArray = Array.isArray(models) ? models.slice() : (typeof model === "string" ? [model] : []);
 
     if (!baseUrl || modelsArray.length === 0) {
-      return NextResponse.json({ error: "baseUrl and at least one model are required" }, { status: 400 });
+      return Response.json({ error: "baseUrl and at least one model are required" }, { status: 400 });
     }
 
     const configDir = getConfigDir();
@@ -161,14 +160,14 @@ export async function POST(request) {
 
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "OpenCode settings applied successfully!",
       configPath,
     });
   } catch (error) {
     console.log("Error applying opencode settings:", error);
-    return NextResponse.json({ error: "Failed to apply settings" }, { status: 500 });
+    return Response.json({ error: "Failed to apply settings" }, { status: 500 });
   }
 }
 
@@ -184,7 +183,7 @@ export async function PATCH(request) {
       config = JSON.parse(existing);
     } catch (error) {
       if (error.code === "ENOENT") {
-        return NextResponse.json({ success: true, message: "No config file found" });
+        return Response.json({ success: true, message: "No config file found" });
       }
       throw error;
     }
@@ -198,13 +197,13 @@ export async function PATCH(request) {
 
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "Settings updated",
     });
   } catch (error) {
     console.log("Error patching opencode settings:", error);
-    return NextResponse.json({ error: "Failed to patch settings" }, { status: 500 });
+    return Response.json({ error: "Failed to patch settings" }, { status: 500 });
   }
 }
 
@@ -221,7 +220,7 @@ export async function DELETE(request) {
       config = JSON.parse(existing);
     } catch (error) {
       if (error.code === "ENOENT") {
-        return NextResponse.json({ success: true, message: "No config file to reset" });
+        return Response.json({ success: true, message: "No config file to reset" });
       }
       throw error;
     }
@@ -254,12 +253,12 @@ export async function DELETE(request) {
 
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: modelToRemove ? `Model "${modelToRemove}" removed` : "9Router settings removed from OpenCode",
     });
   } catch (error) {
     console.log("Error resetting opencode settings:", error);
-    return NextResponse.json({ error: "Failed to reset opencode settings" }, { status: 500 });
+    return Response.json({ error: "Failed to reset opencode settings" }, { status: 500 });
   }
 }

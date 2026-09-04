@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 
 const TIMEOUT_MS = 8000;
 
@@ -85,11 +84,11 @@ export async function POST(request) {
   try {
     const { url } = await request.json();
     if (!url || typeof url !== "string") {
-      return NextResponse.json({ error: "url required" }, { status: 400 });
+      return Response.json({ error: "url required" }, { status: 400 });
     }
     const result = await probeMcp(url);
-    return NextResponse.json(result);
+    return Response.json(result);
   } catch (e) {
-    return NextResponse.json({ error: e.message, tools: [] }, { status: 500 });
+    return Response.json({ error: e.message, tools: [] }, { status: 500 });
   }
 }

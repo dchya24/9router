@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
@@ -93,7 +92,7 @@ export async function GET() {
     const isInstalled = await checkClaudeInstalled();
     
     if (!isInstalled) {
-      return NextResponse.json({
+      return Response.json({
         installed: false,
         settings: null,
         message: "Claude CLI is not installed",
@@ -104,7 +103,7 @@ export async function GET() {
     const has9Router = !!(settings?.env?.ANTHROPIC_BASE_URL);
     const claudeJson = await readClaudeJson();
 
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       settings: settings,
       has9Router: has9Router,
@@ -113,7 +112,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error checking claude settings:", error);
-    return NextResponse.json(
+    return Response.json(
       { error: "Failed to check claude settings" },
       { status: 500 }
     );
@@ -126,7 +125,7 @@ export async function POST(request) {
     const { env, exaMcpEnabled, maxContextTokens } = await request.json();
     
     if (!env || typeof env !== "object") {
-      return NextResponse.json(
+      return Response.json(
         { error: "Invalid env object" },
         { status: 400 }
       );
@@ -182,13 +181,13 @@ export async function POST(request) {
       await writeClaudeJsonMcp(exaMcpEnabled ? { exa: buildExaMcpEntry() } : null);
     }
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "Settings updated successfully",
     });
   } catch (error) {
     console.log("Error updating claude settings:", error);
-    return NextResponse.json(
+    return Response.json(
       { error: "Failed to update claude settings" },
       { status: 500 }
     );
@@ -218,7 +217,7 @@ export async function DELETE() {
       currentSettings = JSON.parse(content);
     } catch (error) {
       if (error.code === "ENOENT") {
-        return NextResponse.json({
+        return Response.json({
           success: true,
           message: "No settings file to reset",
         });
@@ -244,13 +243,13 @@ export async function DELETE() {
     // Write updated settings
     await fs.writeFile(settingsPath, JSON.stringify(currentSettings, null, 2));
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "Settings reset successfully",
     });
   } catch (error) {
     console.log("Error resetting claude settings:", error);
-    return NextResponse.json(
+    return Response.json(
       { error: "Failed to reset claude settings" },
       { status: 500 }
     );

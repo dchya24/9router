@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
@@ -76,7 +75,7 @@ export async function GET() {
   try {
     const installed = await checkGrokInstalled();
     if (!installed) {
-      return NextResponse.json({
+      return Response.json({
         installed: false,
         settings: null,
         message: "Grok Build is not installed",
@@ -84,7 +83,7 @@ export async function GET() {
     }
 
     const settings = parseGrokBuildConfig(await readConfigToml());
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       settings,
       has9Router: has9RouterConfig(settings),
@@ -92,7 +91,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error checking grok-build settings:", error);
-    return NextResponse.json({ error: "Failed to check grok-build settings" }, { status: 500 });
+    return Response.json({ error: "Failed to check grok-build settings" }, { status: 500 });
   }
 }
 
@@ -101,7 +100,7 @@ export async function POST(request) {
     const { baseUrl, apiKey, model, contextWindow, subagentModels } = await request.json();
     const selectedModel = typeof model === "string" ? model.trim() : "";
     if (!baseUrl || !selectedModel) {
-      return NextResponse.json({ error: "baseUrl and model are required" }, { status: 400 });
+      return Response.json({ error: "baseUrl and model are required" }, { status: 400 });
     }
 
     await fs.mkdir(getGrokDir(), { recursive: true });
@@ -115,7 +114,7 @@ export async function POST(request) {
     });
     await fs.writeFile(getGrokConfigPath(), toml);
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "Grok Build settings applied successfully!",
       configPath: getGrokConfigPath(),
@@ -123,7 +122,7 @@ export async function POST(request) {
     });
   } catch (error) {
     console.log("Error updating grok-build settings:", error);
-    return NextResponse.json({ error: "Failed to update grok-build settings" }, { status: 500 });
+    return Response.json({ error: "Failed to update grok-build settings" }, { status: 500 });
   }
 }
 
@@ -135,18 +134,18 @@ export async function DELETE() {
       toml = await fs.readFile(configPath, "utf-8");
     } catch (error) {
       if (error.code === "ENOENT") {
-        return NextResponse.json({ success: true, message: "No config file to reset" });
+        return Response.json({ success: true, message: "No config file to reset" });
       }
       throw error;
     }
 
     await fs.writeFile(configPath, resetGrokBuildConfig(toml));
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "9router model slots removed from Grok Build",
     });
   } catch (error) {
     console.log("Error resetting grok-build settings:", error);
-    return NextResponse.json({ error: "Failed to reset grok-build settings" }, { status: 500 });
+    return Response.json({ error: "Failed to reset grok-build settings" }, { status: 500 });
   }
 }

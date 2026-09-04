@@ -1,6 +1,5 @@
 "use server";
 
-import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
@@ -85,7 +84,7 @@ export async function GET() {
     const isInstalled = await checkCodexInstalled();
     
     if (!isInstalled) {
-      return NextResponse.json({
+      return Response.json({
         installed: false,
         config: null,
         message: "Codex CLI is not installed",
@@ -94,7 +93,7 @@ export async function GET() {
 
     const config = await readConfig();
 
-    return NextResponse.json({
+    return Response.json({
       installed: true,
       config,
       has9Router: has9RouterConfig(config),
@@ -102,7 +101,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error checking codex settings:", error);
-    return NextResponse.json({ error: "Failed to check codex settings" }, { status: 500 });
+    return Response.json({ error: "Failed to check codex settings" }, { status: 500 });
   }
 }
 
@@ -112,7 +111,7 @@ export async function POST(request) {
     const { baseUrl, apiKey, model, subagentModel } = await request.json();
     
     if (!baseUrl || !apiKey || !model) {
-      return NextResponse.json({ error: "baseUrl, apiKey and model are required" }, { status: 400 });
+      return Response.json({ error: "baseUrl, apiKey and model are required" }, { status: 400 });
     }
 
     const codexDir = getCodexDir();
@@ -151,14 +150,14 @@ export async function POST(request) {
     const configContent = stringifyTOML(parsed);
     await fs.writeFile(configPath, configContent);
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "Codex settings applied successfully!",
       configPath,
     });
   } catch (error) {
     console.log("Error updating codex settings:", error);
-    return NextResponse.json({ error: "Failed to update codex settings" }, { status: 500 });
+    return Response.json({ error: "Failed to update codex settings" }, { status: 500 });
   }
 }
 
@@ -174,7 +173,7 @@ export async function DELETE() {
       parsed = parsedToWritable(parseTOML(existingConfig));
     } catch (error) {
       if (error.code === "ENOENT") {
-        return NextResponse.json({
+        return Response.json({
           success: true,
           message: "No config file to reset",
         });
@@ -215,12 +214,12 @@ export async function DELETE() {
       }
     } catch { /* No auth file */ }
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       message: "9Router settings removed successfully",
     });
   } catch (error) {
     console.log("Error resetting codex settings:", error);
-    return NextResponse.json({ error: "Failed to reset codex settings" }, { status: 500 });
+    return Response.json({ error: "Failed to reset codex settings" }, { status: 500 });
   }
 }
