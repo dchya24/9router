@@ -18,11 +18,16 @@
 
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { registerGuards } from "./guard.js";
 
 const PORT = Number(process.env.PORT || 20127);
 const HOST = process.env.HOST || "0.0.0.0";
 
 const app = new Hono();
+
+// Peer-header stamping + port of the Next middleware (deny-by-default auth).
+// Must register before any route.
+registerGuards(app);
 
 // ─── Lazy route module loading (mirrors Next's per-route lazy bundles) ──────
 const modCache = new Map();
@@ -38,6 +43,7 @@ function loaderFor(baseDir) {
 }
 const v1 = loaderFor("v1");
 const v1beta = loaderFor("v1beta");
+const api = loaderFor("usage");
 
 // Adapts a Next route handler to a Hono handler.
 // opts.catchAll: param name receiving path segments after catchAllPrefix.
@@ -154,6 +160,24 @@ for (const [prefix, routes, catchAllPrefix] of [
   register(prefix, resolved);
 }
 
+// ─── Admin API groups (Phase 3, migrated per group) ─────────────────────────
+const USAGE_ROUTES = [
+  ["GET", "/usage/chart", () => api("/chart/route.js")],
+  ["GET", "/usage/history", () => api("/history/route.js")],
+  ["GET", "/usage/logs", () => api("/logs/route.js")],
+  ["GET", "/usage/providers", () => api("/providers/route.js")],
+  ["GET", "/usage/request-details", () => api("/request-details/route.js")],
+  ["GET", "/usage/request-logs", () => api("/request-logs/route.js")],
+  ["GET", "/usage/stats", () => api("/stats/route.js")],
+  // Live usage SSE — EventTarget emitter + ReadableStream, no Next APIs
+  ["GET", "/usage/stream", () => api("/stream/route.js")],
+  // /usage/[connectionId]
+  ["GET", "/usage/:connectionId", () => api("/[connectionId]/route.js"), { id: "connectionId" }],
+  ["GET", "/usage/:connectionId/codex-reset-credits", () => api("/[connectionId]/codex-reset-credits/route.js"), { id: "connectionId" }],
+  ["POST", "/usage/:connectionId/codex-reset-credits", () => api("/[connectionId]/codex-reset-credits/route.js"), { id: "connectionId" }],
+];
+register("/api", USAGE_ROUTES);
+
 // ─── Remaining Next rewrites, via internal re-dispatch ──────────────────────
 async function redispatch(c, newPath) {
   const url = new URL(c.req.url);
@@ -179,7 +203,42 @@ app.all("/codex/*", (c) => redispatch(c, "/api/v1/responses"));
 // ─── Ops endpoints ──────────────────────────────────────────────────────────
 app.get("/healthz", (c) => c.json({ ok: true, server: "hono" }));
 
-app.notFound((c) => c.json({ error: { message: "Not found", type: "invalid_request_error" } }, 404));
+// ─── Front-proxy mode (Phase 3 transition) ──────────────────────────────────
+// With NEXT_UPSTREAM set (e.g. http://127.0.0.1:20127), any path not handled
+// above — unmigrated admin APIs, dashboard pages, static assets — is proxied
+// to the Next standalone server on a private port. Hono owns the public port.
+const NEXT_UPSTREAM = process.env.NEXT_UPSTREAM;
+if (NEXT_UPSTREAM) {
+  const upstream = new URL(NEXT_UPSTREAM);
+  app.notFound(async (c) => {
+    const url = new URL(c.req.url);
+    const target = new URL(url.pathname + url.search, upstream);
+    const method = c.req.method;
+    const hasBody = !["GET", "HEAD"].includes(method);
+    try {
+      const res = await fetch(target, {
+        method,
+        headers: c.req.raw.headers,
+        ...(hasBody ? { body: c.req.raw.body, duplex: "half" } : {}),
+        redirect: "manual",
+      });
+      // undici decodes gzip/br but keeps the headers; dropping them stops
+      // clients from trying to decode the already-decoded stream.
+      const headers = new Headers(res.headers);
+      headers.delete("content-encoding");
+      headers.delete("content-length");
+      headers.delete("transfer-encoding");
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+    } catch (e) {
+      return c.json(
+        { error: { message: `Upstream ${NEXT_UPSTREAM} unavailable: ${e?.message || e}`, type: "upstream_error" } },
+        502
+      );
+    }
+  });
+} else {
+  app.notFound((c) => c.json({ error: { message: "Not found", type: "invalid_request_error" } }, 404));
+}
 
 app.onError((err, c) => {
   console.error("[hono] unhandled error:", err && err.stack ? err.stack : err);

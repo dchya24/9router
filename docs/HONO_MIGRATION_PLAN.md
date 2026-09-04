@@ -1,6 +1,7 @@
 # Hono Migration Plan — Proxy API on bare Node
 
-_Status: Phase 2 spike complete & validated (2026-09-03). Next up: Phase 3._
+_Status: Phase 2 spike validated; Phase 3 started — `usage` group migrated,
+security middleware ported, front-proxy mode working (2026-09-04)._
 
 ## Goal
 
@@ -16,11 +17,12 @@ Measured (Node 20, warm-idle RSS, identical warmup protocol — see
 
 | Target                          | Warm-idle RSS (median) | p80     |
 | ------------------------------- | ---------------------- | ------- |
-| Next standalone + custom-server | ~115 MB                | ~148 MB |
-| Hono (`/v1` surface loaded)     | ~90–97 MB              | ~125 MB |
+| Next standalone + custom-server | ~115–154 MB (varies)   | ~148+ MB |
+| Hono (full `/v1` + usage + guard loaded) | ~90–97 MB     | ~125 MB |
 
-Savings grow as more of the 130+ dashboard API groups migrate off Next; the
-numbers above only reflect the `/v1` surface.
+Savings grow as more of the 130+ dashboard API groups migrate off Next. Next's
+RSS swings more between runs than Hono's; the direction is consistent across
+every run.
 
 ## Architecture
 
@@ -105,19 +107,38 @@ Run: `npm run hono:start` (default port 20127; `PORT`/`HOST` env). Shares the
 same `DATA_DIR`/SQLite DB as Next, so both servers can run side by side during
 migration. `package.json` adds `hono` + `@hono/node-server` deps only.
 
-### Phase 3 — Admin API groups onto Hono (next up)
+### 🚧 Phase 3 — Admin API groups onto Hono (in progress)
 Migrate dashboard API groups one at a time, cheapest first:
 `usage` → `providers`/`models` → `cli-tools` → `proxy-pools`/`settings`/combos/keys.
-For each group:
-1. Replace `NextResponse.json()` → `Response.json()` (mechanical, ~120 files
-   overall; do per group).
-2. Drop route files from Next into Hono's route table (the adapter already
-   handles them).
-3. While Next still serves the dashboard, Hono becomes the front server on
-   :20127 and internally proxies not-yet-migrated `/api/*` paths to a
-   Next instance on a private port (re-dispatch pattern already proven in
-   `server.js`).
-4. Re-run `mem-bench.mjs` after each group to track the curve.
+
+**Security middleware — done, prerequisite for every group.** The real auth
+layer is not per-route code but the Next.js 16 middleware at `src/proxy.js`
+(`middleware` renamed in v16) → `src/dashboardGuard.js`: deny-by-default for
+`/api/*` with a public allow-list, `LOCAL_ONLY` gates, `ALWAYS_PROTECTED`
+routes, an API-key gate on the LLM surface (`canAccessPublicLlmApi`), and
+dashboard page protection. `hono-server/guard.js` ports it 1:1, plus the
+`custom-server.js` peer-header stamping (`x-9r-real-ip`, `x-9r-peer-token`,
+`x-9r-via-proxy`, XFF stripping) that `isLocalRequest()` depends on. Verified
+verdict-parity against Next direct for: 401/200/403 paths, redirect chains
+(`/` → `/dashboard` → `/login`), remote-access key gate, and authed access via
+JWT cookie. **While both servers run, the guard exists in two copies — any
+change to `dashboardGuard.js` must be mirrored in `hono-server/guard.js`.**
+
+**Front-proxy mode — done.** With `NEXT_UPSTREAM=http://127.0.0.1:<port>`
+set, Hono owns the public port and proxies every unregistered path (unmigrated
+APIs, dashboard pages, static assets) to the Next standalone instance on a
+private port, with undici's stale `content-encoding`/`content-length` headers
+stripped. Next's own middleware re-validates proxied requests.
+
+**Group `usage` — done (10 routes).** Codemod `NextResponse.json(` →
+`Response.json(` + drop the `next/server` import (7 files), register in the
+route table (incl. `/usage/:connectionId`, `/usage/:connectionId/codex-reset-credits`
+POST, and the EventEmitter-based `/usage/stream` SSE). All verified through the
+Hono front against a production-backup import: stats/chart parity with Next,
+stream events flowing, unmigrated proxying intact.
+
+Remaining groups: apply the same three steps (codemod → register → verify),
+then re-run `mem-bench.mjs` to track the curve.
 
 ### Phase 3.5 — Port custom-server security wrapper (required before full front)
 Currently documented as TODO in `hono-server/server.js`:
@@ -150,7 +171,8 @@ Currently documented as TODO in `hono-server/server.js`:
 
 | Path | Purpose |
 | ---- | ------- |
-| `hono-server/server.js` | Entry: route table, rewrites, bg token refresh, serve |
+| `hono-server/server.js` | Entry: route table, rewrites, front-proxy (`NEXT_UPSTREAM`), serve |
+| `hono-server/guard.js` | Port of Next middleware + peer-header stamping (auth backbone) |
 | `hono-server/alias-loader.mjs` | Node resolve hook for `@/`, `open-sse`, CJS shim |
 | `hono-server/register.mjs` | Loader registration (`--import` target) |
 | `hono-server/shims/node-machine-id.mjs` | CJS→ESM interop shim |
