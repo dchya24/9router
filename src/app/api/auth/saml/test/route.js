@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSettings } from "@/lib/localDb";
 import { formatX509Certificate } from "@/lib/auth/saml.js";
@@ -16,7 +15,7 @@ async function canAccessTestRoute() {
 export async function POST(request) {
   try {
     if (!(await canAccessTestRoute())) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json().catch(() => ({}));
@@ -31,33 +30,33 @@ export async function POST(request) {
     ).trim();
 
     if (!samlEntryPoint) {
-      return NextResponse.json({ error: "Single Sign-On Service URL (samlEntryPoint) is required" }, { status: 400 });
+      return Response.json({ error: "Single Sign-On Service URL (samlEntryPoint) is required" }, { status: 400 });
     }
 
     try {
       new URL(samlEntryPoint);
     } catch {
-      return NextResponse.json({ error: "Single Sign-On Service URL must be a valid URL" }, { status: 400 });
+      return Response.json({ error: "Single Sign-On Service URL must be a valid URL" }, { status: 400 });
     }
 
     if (!samlIssuer) {
-      return NextResponse.json({ error: "SP Entity ID / Issuer (samlIssuer) is required" }, { status: 400 });
+      return Response.json({ error: "SP Entity ID / Issuer (samlIssuer) is required" }, { status: 400 });
     }
 
     if (!samlCert) {
-      return NextResponse.json({ error: "IdP X.509 Certificate (samlCert) is required" }, { status: 400 });
+      return Response.json({ error: "IdP X.509 Certificate (samlCert) is required" }, { status: 400 });
     }
 
     const formattedCert = formatX509Certificate(samlCert);
     if (!formattedCert) {
-      return NextResponse.json({ error: "Invalid IdP X.509 Certificate format" }, { status: 400 });
+      return Response.json({ error: "Invalid IdP X.509 Certificate format" }, { status: 400 });
     }
 
     const origin = new URL(request.url).origin;
     const acsUrl = `${origin}/api/auth/saml/acs`;
     const metadataUrl = `${origin}/api/auth/saml/metadata`;
 
-    return NextResponse.json({
+    return Response.json({
       ok: true,
       samlEntryPoint,
       samlIssuer,
@@ -67,6 +66,6 @@ export async function POST(request) {
       message: "SAML 2.0 configuration verified successfully.",
     });
   } catch (error) {
-    return NextResponse.json({ error: error.message || "SAML test failed" }, { status: 500 });
+    return Response.json({ error: error.message || "SAML test failed" }, { status: 500 });
   }
 }

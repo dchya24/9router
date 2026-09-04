@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createProviderConnection } from "@/models";
 import { normalizeKiroExternalIdpAuth } from "@/lib/oauth/kiroExternalIdp";
 
@@ -23,7 +22,7 @@ export async function POST(request) {
       testStatus: "active",
     });
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       connection: {
         id: connection.id,
@@ -32,7 +31,7 @@ export async function POST(request) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
+    return Response.json(
       { error: error?.message || "CLIProxyAPI import failed" },
       { status: 400 }
     );

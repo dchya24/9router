@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSettings } from "@/lib/localDb";
 import {
@@ -11,6 +10,8 @@ import {
 import { setDashboardAuthCookie } from "@/lib/auth/dashboardSession";
 import { checkLock, recordFail, recordSuccess, getClientIp } from "@/lib/auth/loginLimiter";
 
+// NextResponse.redirect defaults to 307 (Response.redirect defaults to 302)
+function redirect(url, status = 307) { return Response.redirect(url, status); }
 export async function POST(request) {
   const settings = await getSettings();
   const origin = getSamlBaseUrl(request, settings);
@@ -18,7 +19,7 @@ export async function POST(request) {
 
   const lock = checkLock(ip);
   if (lock.locked) {
-    return NextResponse.redirect(
+    return redirect(
       new URL(
         `/login?error=${encodeURIComponent(`Too many failed attempts. Try again in ${lock.retryAfter}s.`)}`,
         origin
@@ -38,12 +39,12 @@ export async function POST(request) {
 
     if (!SAMLResponse) {
       recordFail(ip);
-      return NextResponse.redirect(new URL("/login?error=saml_missing_response", origin));
+      return redirect(new URL("/login?error=saml_missing_response", origin));
     }
 
     if (!isSamlConfigured(settings)) {
       recordFail(ip);
-      return NextResponse.redirect(new URL("/login?error=saml_not_configured", origin));
+      return redirect(new URL("/login?error=saml_not_configured", origin));
     }
 
     const profile = await validateSamlResponse(request, { SAMLResponse }, storedRequestId, settings);
@@ -59,10 +60,10 @@ export async function POST(request) {
       samlName,
     });
 
-    return NextResponse.redirect(new URL("/dashboard", origin));
+    return redirect(new URL("/dashboard", origin));
   } catch (error) {
     recordFail(ip);
-    return NextResponse.redirect(
+    return redirect(
       new URL(`/login?error=${encodeURIComponent(error.message || "saml_acs_failed")}`, origin)
     );
   }

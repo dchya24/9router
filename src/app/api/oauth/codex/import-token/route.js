@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createProviderConnection } from "@/models";
 import { extractCodexAccountInfo } from "@/lib/oauth/providers";
 
@@ -14,7 +13,7 @@ export async function POST(request) {
     const { accessToken, name } = await request.json();
 
     if (!accessToken || typeof accessToken !== "string") {
-      return NextResponse.json(
+      return Response.json(
         { error: "Access token is required" },
         { status: 400 }
       );
@@ -78,7 +77,7 @@ export async function POST(request) {
       testStatus: "active",
     });
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       connection: {
         id: connection.id,
@@ -91,6 +90,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.log("Codex access token import error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

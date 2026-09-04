@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { access, constants } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
@@ -191,7 +190,7 @@ export async function GET() {
     }
 
     if (!dbPath) {
-      return NextResponse.json({
+      return Response.json({
         found: false,
         error: `Cursor database not found. Checked locations:\n${candidates.join("\n")}\n\nMake sure Cursor IDE is installed and opened at least once.`,
       });
@@ -211,7 +210,7 @@ export async function GET() {
         } catch { /* not found */ }
       }
       if (!cursorInstalled) {
-        return NextResponse.json({
+        return Response.json({
           found: false,
           error: "Cursor config files found but Cursor IDE does not appear to be installed. Skipping auto-import.",
         });
@@ -222,7 +221,7 @@ export async function GET() {
     try {
       const tokens = extractTokensViaBetterSqlite(dbPath);
       if (tokens.accessToken && tokens.machineId) {
-        return NextResponse.json({
+        return Response.json({
           found: true,
           accessToken: tokens.accessToken,
           machineId: tokens.machineId,
@@ -236,7 +235,7 @@ export async function GET() {
     try {
       const tokens = await extractTokensViaCLI(dbPath);
       if (tokens.accessToken && tokens.machineId) {
-        return NextResponse.json({
+        return Response.json({
           found: true,
           accessToken: tokens.accessToken,
           machineId: tokens.machineId,
@@ -247,10 +246,10 @@ export async function GET() {
     }
 
     // Strategy 3: ask user to paste manually
-    return NextResponse.json({ found: false, windowsManual: true, dbPath });
+    return Response.json({ found: false, windowsManual: true, dbPath });
   } catch (error) {
     console.log("Cursor auto-import error:", error);
-    return NextResponse.json(
+    return Response.json(
       { found: false, error: error.message },
       { status: 500 },
     );

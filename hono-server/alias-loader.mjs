@@ -15,6 +15,14 @@ function resolveAlias(specifier) {
   if (specifier === "node-machine-id") {
     return path.join(projectRoot, "hono-server", "shims", "node-machine-id.mjs");
   }
+  // Next request-context modules, replaced with per-request AsyncLocalStorage
+  // shims (see shims/next-headers.mjs) and minimal classes (next-server.mjs).
+  if (specifier === "next/headers") {
+    return path.join(projectRoot, "hono-server", "shims", "next-headers.mjs");
+  }
+  if (specifier === "next/server") {
+    return path.join(projectRoot, "hono-server", "shims", "next-server.mjs");
+  }
   if (specifier === "open-sse") return path.join(projectRoot, "open-sse", "index.js");
   if (specifier.startsWith("open-sse/")) {
     return path.join(projectRoot, "open-sse", specifier.slice("open-sse/".length));

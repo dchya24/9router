@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   getProvider,
   generateAuthData,
@@ -100,7 +99,7 @@ export async function GET(request, { params }) {
         try { const p = new URL(redirectUri).port; if (p) meta.nativeAppPort = p; } catch { /* ignore */ }
       }
       const authData = await generateAuthData(provider, redirectUri, Object.keys(meta).length ? meta : undefined);
-      return NextResponse.json(authData);
+      return Response.json(authData);
     }
 
     if (action === "start-proxy") {
@@ -108,24 +107,24 @@ export async function GET(request, { params }) {
       // state is registered separately via /register-session after /authorize).
       if (provider === "trae") {
         const result = await startTraeProxy();
-        return NextResponse.json(result);
+        return Response.json(result);
       }
       if (provider === "windsurf") {
         const result = await startWindsurfProxy();
-        return NextResponse.json(result);
+        return Response.json(result);
       }
       if (provider === "zed") {
         // Prefer ZED_HOSTED_CONFIG.defaultNativeAppPort (58443) so the browser redirect
         // matches what Zed expects; falls back to a random port if it's busy.
         const result = await startZedProxy(searchParams.get("native_app_port") || ZED_HOSTED_CONFIG.defaultNativeAppPort);
-        return NextResponse.json(result);
+        return Response.json(result);
       }
       if (!["codex", "xai"].includes(provider)) {
-        return NextResponse.json({ error: "Proxy only supported for codex/xai/trae/windsurf/zed" }, { status: 400 });
+        return Response.json({ error: "Proxy only supported for codex/xai/trae/windsurf/zed" }, { status: 400 });
       }
       const appPort = searchParams.get("app_port");
       if (!appPort) {
-        return NextResponse.json({ error: "Missing app_port" }, { status: 400 });
+        return Response.json({ error: "Missing app_port" }, { status: 400 });
       }
       const state = searchParams.get("state");
       const codeVerifier = searchParams.get("code_verifier");
@@ -139,13 +138,13 @@ export async function GET(request, { params }) {
           ? registerXaiSession({ state, codeVerifier, redirectUri })
           : registerCodexSession({ state, codeVerifier, redirectUri });
       }
-      return NextResponse.json({ ...result, serverSide });
+      return Response.json({ ...result, serverSide });
     }
 
     if (action === "poll-status") {
       const state = searchParams.get("state");
       if (!state) {
-        return NextResponse.json({ error: "Missing state" }, { status: 400 });
+        return Response.json({ error: "Missing state" }, { status: 400 });
       }
       let session;
       if (provider === "trae") session = getTraeSessionStatus(state);
@@ -153,8 +152,8 @@ export async function GET(request, { params }) {
       else if (provider === "zed") session = getZedSessionStatus(state);
       else if (provider === "xai") session = getXaiSessionStatus(state);
       else if (provider === "codex") session = getCodexSessionStatus(state);
-      else return NextResponse.json({ error: "Poll only supported for codex/xai/trae/windsurf/zed" }, { status: 400 });
-      if (!session) return NextResponse.json({ status: "unknown" });
+      else return Response.json({ error: "Poll only supported for codex/xai/trae/windsurf/zed" }, { status: 400 });
+      if (!session) return Response.json({ status: "unknown" });
       if (session.status === "done" || session.status === "error") {
         const payload = { ...session };
         if (provider === "trae") clearTraeSession(state);
@@ -162,9 +161,9 @@ export async function GET(request, { params }) {
         else if (provider === "zed") clearZedSession(state);
         else if (provider === "xai") clearXaiSession(state);
         else clearCodexSession(state);
-        return NextResponse.json(payload);
+        return Response.json(payload);
       }
-      return NextResponse.json({ status: session.status });
+      return Response.json({ status: session.status });
     }
 
     if (action === "stop-proxy") {
@@ -173,23 +172,23 @@ export async function GET(request, { params }) {
       else if (provider === "zed") stopZedProxy();
       else if (provider === "xai") stopXaiProxy();
       else if (provider === "codex") stopCodexProxy();
-      else return NextResponse.json({ error: "Proxy only supported for codex/xai/trae/windsurf/zed" }, { status: 400 });
-      return NextResponse.json({ success: true });
+      else return Response.json({ error: "Proxy only supported for codex/xai/trae/windsurf/zed" }, { status: 400 });
+      return Response.json({ success: true });
     }
 
     if (action === "ide-status") {
       // Detect whether the IDE is installed locally (used by import-token UX).
       if (provider !== "trae" && provider !== "windsurf") {
-        return NextResponse.json({ error: "ide-status only supported for trae/windsurf" }, { status: 400 });
+        return Response.json({ error: "ide-status only supported for trae/windsurf" }, { status: 400 });
       }
       const status = await detectIdeInstalled(provider);
-      return NextResponse.json(status);
+      return Response.json(status);
     }
 
     if (action === "device-code") {
       const providerData = getProvider(provider);
       if (providerData.flowType !== "device_code") {
-        return NextResponse.json({ error: "Provider does not support device code flow" }, { status: 400 });
+        return Response.json({ error: "Provider does not support device code flow" }, { status: 400 });
       }
 
       const authData = await generateAuthData(provider, null);
@@ -224,7 +223,7 @@ export async function GET(request, { params }) {
         deviceData = await requestDeviceCode(provider, authData.codeChallenge, deviceOptions);
       }
 
-      return NextResponse.json({
+      return Response.json({
         ...deviceData,
         // Prefer the verifier the provider's requestDeviceCode generated for
         // itself (qoder rolls its own PKCE pair); fall back to the generic one.
@@ -232,10 +231,10 @@ export async function GET(request, { params }) {
       });
     }
 
-    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    return Response.json({ error: "Unknown action" }, { status: 400 });
   } catch (error) {
     console.log("OAuth GET error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }
 
@@ -248,7 +247,7 @@ export async function POST(request, { params }) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: "Invalid or empty request body" }, { status: 400 });
+      return Response.json({ error: "Invalid or empty request body" }, { status: 400 });
     }
 
     if (action === "register-session") {
@@ -256,13 +255,13 @@ export async function POST(request, { params }) {
       // Zed's codeVerifier encodes the RSA private key — must stay out of URL/logs.
       const searchParams = new URL(request.url).searchParams;
       const state = searchParams.get("state") || body?.state;
-      if (!state) return NextResponse.json({ error: "Missing state" }, { status: 400 });
+      if (!state) return Response.json({ error: "Missing state" }, { status: 400 });
       let ok = false;
       if (provider === "trae") ok = registerTraeSession({ state });
       else if (provider === "windsurf") ok = registerWindsurfSession({ state });
       else if (provider === "zed") ok = registerZedSession({ state, codeVerifier: body?.codeVerifier });
-      else return NextResponse.json({ error: "register-session only supported for trae/windsurf/zed" }, { status: 400 });
-      return NextResponse.json({ success: ok });
+      else return Response.json({ error: "register-session only supported for trae/windsurf/zed" }, { status: 400 });
+      return Response.json({ success: ok });
     }
 
     if (action === "exchange") {
@@ -273,7 +272,7 @@ export async function POST(request, { params }) {
       if (provider === "trae" || provider === "windsurf") {
         const token = typeof code === "string" ? code.trim() : "";
         if (!token) {
-          return NextResponse.json({ error: "Missing token or callback URL" }, { status: 400 });
+          return Response.json({ error: "Missing token or callback URL" }, { status: 400 });
         }
         try {
           const tokenData = await exchangeTokens(provider, token, null, null, state);
@@ -286,7 +285,7 @@ export async function POST(request, { params }) {
               : null,
             testStatus: "active",
           });
-          return NextResponse.json({
+          return Response.json({
             success: true,
             connection: {
               id: connection.id,
@@ -296,7 +295,7 @@ export async function POST(request, { params }) {
             }
           });
         } catch (err) {
-          return NextResponse.json({ error: err.message }, { status: 500 });
+          return Response.json({ error: err.message }, { status: 500 });
         }
       }
 
@@ -331,7 +330,7 @@ export async function POST(request, { params }) {
           testStatus: "active",
         });
 
-        return NextResponse.json({
+        return Response.json({
           success: true,
           connection: {
             id: connection.id,
@@ -345,7 +344,7 @@ export async function POST(request, { params }) {
       // Cline and ClinePass use authorization_code without PKCE. Kimchi returns a browser token.
       const noPkceExchangeProviders = ["cline", "clinepass", "kimchi"];
       if (!code || !redirectUri || (!codeVerifier && !noPkceExchangeProviders.includes(provider))) {
-        return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        return Response.json({ error: "Missing required fields" }, { status: 400 });
       }
 
       // Exchange code for tokens (meta carries provider-specific params, e.g. gitlab clientId/baseUrl)
@@ -362,7 +361,7 @@ export async function POST(request, { params }) {
         testStatus: "active",
       });
 
-      return NextResponse.json({ 
+      return Response.json({ 
         success: true, 
         connection: {
           id: connection.id,
@@ -377,7 +376,7 @@ export async function POST(request, { params }) {
       const { deviceCode, codeVerifier, extraData } = body;
 
       if (!deviceCode) {
-        return NextResponse.json({ error: "Missing device code" }, { status: 400 });
+        return Response.json({ error: "Missing device code" }, { status: 400 });
       }
 
       // Providers that don't use PKCE for device code
@@ -394,13 +393,13 @@ export async function POST(request, { params }) {
         // captured at device-code time (extraData._qoderMachineId) so
         // mapTokens can persist it for COSY signing.
         if (!codeVerifier) {
-          return NextResponse.json({ error: "Missing code verifier" }, { status: 400 });
+          return Response.json({ error: "Missing code verifier" }, { status: 400 });
         }
         result = await pollForToken(provider, deviceCode, codeVerifier, extraData);
       } else {
         // Qwen and other PKCE providers
         if (!codeVerifier) {
-          return NextResponse.json({ error: "Missing code verifier" }, { status: 400 });
+          return Response.json({ error: "Missing code verifier" }, { status: 400 });
         }
         result = await pollForToken(provider, deviceCode, codeVerifier);
       }
@@ -418,7 +417,7 @@ export async function POST(request, { params }) {
           testStatus: "active",
         });
 
-        return NextResponse.json({ 
+        return Response.json({ 
           success: true, 
           connection: {
             id: connection.id,
@@ -430,7 +429,7 @@ export async function POST(request, { params }) {
       // Still pending or error - don't create connection for pending states
       const isPending = result.pending || result.error === "authorization_pending" || result.error === "slow_down";
       
-      return NextResponse.json({
+      return Response.json({
         success: false,
         error: result.error,
         errorDescription: result.errorDescription,
@@ -440,16 +439,16 @@ export async function POST(request, { params }) {
 
     if (action === "manual-code") {
       if (provider !== "xai") {
-        return NextResponse.json({ error: "Manual code only supported for xai" }, { status: 400 });
+        return Response.json({ error: "Manual code only supported for xai" }, { status: 400 });
       }
       const { code, state } = body;
       const connection = await completeXaiManualCode(String(code || "").trim(), String(state || "").trim());
-      return NextResponse.json({ success: true, connection });
+      return Response.json({ success: true, connection });
     }
 
-    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    return Response.json({ error: "Unknown action" }, { status: 400 });
   } catch (error) {
     console.log("OAuth POST error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

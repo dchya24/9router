@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSettings } from "@/lib/localDb";
 import { fetchOidcDiscovery, getPublicOrigin, probeOidcClientSecret } from "@/lib/auth/oidc";
@@ -16,7 +15,7 @@ async function canAccessTestRoute() {
 export async function POST(request) {
   try {
     if (!(await canAccessTestRoute())) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json().catch(() => ({}));
@@ -32,10 +31,10 @@ export async function POST(request) {
     ).trim();
 
     if (!issuerUrl) {
-      return NextResponse.json({ error: "Issuer URL is required" }, { status: 400 });
+      return Response.json({ error: "Issuer URL is required" }, { status: 400 });
     }
     if (!clientId) {
-      return NextResponse.json({ error: "Client ID is required" }, { status: 400 });
+      return Response.json({ error: "Client ID is required" }, { status: 400 });
     }
 
     const discovery = await fetchOidcDiscovery(issuerUrl);
@@ -48,7 +47,7 @@ export async function POST(request) {
     });
 
     if (secretProbe.tested && secretProbe.valid === false) {
-      return NextResponse.json({
+      return Response.json({
         ok: false,
         discoveryOk: true,
         clientSecretTested: true,
@@ -64,7 +63,7 @@ export async function POST(request) {
       });
     }
 
-    return NextResponse.json({
+    return Response.json({
       ok: true,
       discoveryOk: true,
       clientSecretTested: secretProbe.tested,
@@ -79,6 +78,6 @@ export async function POST(request) {
       message: secretProbe.message,
     });
   } catch (error) {
-    return NextResponse.json({ error: error.message || "OIDC test failed" }, { status: 500 });
+    return Response.json({ error: error.message || "OIDC test failed" }, { status: 500 });
   }
 }

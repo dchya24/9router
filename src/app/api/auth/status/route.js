@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSettings } from "@/lib/localDb";
 import { isOidcConfigured } from "@/lib/auth/oidc";
@@ -27,7 +26,7 @@ export async function GET() {
 
     const loginMethod = session?.saml ? "SAML" : session?.oidc ? "OIDC" : "Password";
 
-    return NextResponse.json({
+    return Response.json({
       requireLogin,
       authMode,
       ssoType,
@@ -47,7 +46,7 @@ export async function GET() {
       samlLogin: !!session?.saml,
     });
   } catch {
-    return NextResponse.json({
+    return Response.json({
       requireLogin: true,
       authMode: "password",
       ssoType: "oidc",

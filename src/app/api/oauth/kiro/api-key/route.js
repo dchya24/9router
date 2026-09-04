@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { KiroService } from "@/lib/oauth/services/kiro";
 import { createProviderConnection } from "@/models";
 
@@ -13,7 +12,7 @@ export async function POST(request) {
     const { apiKey, region } = await request.json();
 
     if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
-      return NextResponse.json(
+      return Response.json(
         { error: "API key is required" },
         { status: 400 }
       );
@@ -48,7 +47,7 @@ export async function POST(request) {
       testStatus: "active",
     });
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       connection: {
         id: connection.id,
@@ -59,7 +58,7 @@ export async function POST(request) {
   } catch (error) {
     console.log("Kiro API key import error:", error);
     // Do not reflect upstream response body to the client (SSRF hardening)
-    return NextResponse.json(
+    return Response.json(
       { error: "API key validation failed" },
       { status: 500 }
     );

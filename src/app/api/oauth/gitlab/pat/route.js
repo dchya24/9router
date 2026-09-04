@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createProviderConnection } from "@/models";
 
 const GITLAB_DEFAULT_BASE = "https://gitlab.com";
@@ -13,12 +12,12 @@ export async function POST(request) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return Response.json({ error: "Invalid request body" }, { status: 400 });
     }
 
     const { token, baseUrl } = body;
     if (!token?.trim()) {
-      return NextResponse.json({ error: "Personal Access Token is required" }, { status: 400 });
+      return Response.json({ error: "Personal Access Token is required" }, { status: 400 });
     }
 
     const base = (baseUrl?.trim() || GITLAB_DEFAULT_BASE).replace(/\/$/, "");
@@ -30,7 +29,7 @@ export async function POST(request) {
 
     if (!userRes.ok) {
       const err = await userRes.text();
-      return NextResponse.json({ error: `GitLab token verification failed: ${err}` }, { status: 401 });
+      return Response.json({ error: `GitLab token verification failed: ${err}` }, { status: 401 });
     }
 
     const user = await userRes.json();
@@ -54,9 +53,9 @@ export async function POST(request) {
       },
     });
 
-    return NextResponse.json({ success: true });
+    return Response.json({ success: true });
   } catch (error) {
     console.error("GitLab PAT auth error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

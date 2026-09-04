@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createProviderConnection } from "@/models";
 import { extractCodexAccountInfo } from "@/lib/oauth/providers";
 
@@ -21,7 +20,7 @@ export async function POST(request) {
   try {
     body = await request.json();
   } catch (err) {
-    return NextResponse.json(
+    return Response.json(
       { error: `Invalid JSON body: ${err.message}` },
       { status: 400 }
     );
@@ -40,7 +39,7 @@ export async function POST(request) {
   }
 
   if (!Array.isArray(accounts) || accounts.length === 0) {
-    return NextResponse.json(
+    return Response.json(
       { error: "No accounts provided" },
       { status: 400 }
     );
@@ -117,5 +116,5 @@ export async function POST(request) {
     }
   }
 
-  return NextResponse.json({ success, failed, results });
+  return Response.json({ success, failed, results });
 }

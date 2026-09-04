@@ -134,7 +134,21 @@ stripped. Next's own middleware re-validates proxied requests.
 `combos` (2), `proxy-pools` (6), `settings` (4), `version` (3), `pricing` (1),
 `tags` (1), `init` (1), `health` (1), `locale` (1), `translator` (6),
 `mcp` (2), `pxpipe` (8), `headroom` (6), `media-providers` (5),
-`tunnel` (7) = 82 admin routes.**
+`tunnel` (7), `auth` (11), `oauth` (14) = 107 admin routes** (all but
+`cli-tools` + `shutdown`).
+
+**Auth cookie flows — done via a `next/headers` shim.** Route files keep their
+`import { cookies } from "next/headers"` untouched; the alias loader maps it
+to `hono-server/shims/next-headers.mjs`, an AsyncLocalStorage-based shim whose
+cookie store implements the same API (`get`/`set`/`delete`, same serialization
+order and casing as the `cookie` package Next uses). The Hono adapter opens a
+per-request context (`runWithRequest`) and applies pending Set-Cookie values
+to the response. A minimal `next/server` shim also satisfies `dashboardGuard`
+(whose middleware-only code is never executed here). Verified vs Next: login
+200 + **identical Set-Cookie attributes** (`Path=/; HttpOnly; SameSite=lax`),
+wrong-password 401 body parity, `/auth/status` authed/unauthed parity,
+logout cookie-clearing chain, SAML/OIDC unconfigured redirects (307 → identical
+login error URLs), oauth unknown-provider 401 parity.
 Codemod `NextResponse.json(` → `Response.json(` + drop the `next/server`
 import, register in the route table (incl. dynamic `[id]`/`[connectionId]`/
 `[plugin]` routes, the EventEmitter-based `/usage/stream` SSE, and the ported

@@ -19,6 +19,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { registerGuards } from "./guard.js";
+import { runWithRequest } from "./shims/next-headers.mjs";
 
 const PORT = Number(process.env.PORT || 20127);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -61,10 +62,15 @@ const apiPxpipe = loaderFor("pxpipe");
 const apiHeadroom = loaderFor("headroom");
 const apiMedia = loaderFor("media-providers");
 const apiTunnel = loaderFor("tunnel");
+const apiAuth = loaderFor("auth");
+const apiOauth = loaderFor("oauth");
 
 // Adapts a Next route handler to a Hono handler.
 // opts.catchAll: param name receiving path segments after catchAllPrefix.
 // opts.id: single dynamic param passed through.
+// opts.params: list of dynamic param names (e.g. oauth [provider]/[action]).
+// The handler runs inside the next-headers shim context, so cookies()/
+// headers() work; pending Set-Cookie values are applied to the response.
 function on(method, modLoader, opts = {}) {
   return async (c) => {
     const mod = await modLoader();
@@ -74,13 +80,31 @@ function on(method, modLoader, opts = {}) {
     }
     const params = {};
     if (opts.id) params[opts.id] = c.req.param(opts.id);
+    if (opts.params) for (const name of opts.params) params[name] = c.req.param(name);
     if (opts.catchAll) {
       const rest = c.req.path.startsWith(opts.catchAllPrefix)
         ? c.req.path.slice(opts.catchAllPrefix.length)
         : c.req.path;
       params[opts.catchAll] = rest.split("/").filter(Boolean);
     }
-    return fn(c.req.raw, { params: Promise.resolve(params) });
+    const secondArg = (opts.id || opts.params || opts.catchAll)
+      ? { params: Promise.resolve(params) }
+      : undefined;
+
+    let res;
+    try {
+      const { result, pending } = runWithRequest(c.req.raw, () => fn(c.req.raw, secondArg));
+      res = await result;
+      if (pending?.length && res) {
+        const headers = new Headers(res.headers);
+        for (const cookie of pending) headers.append("set-cookie", cookie);
+        res = new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+      }
+    } catch (e) {
+      console.error(`[hono] ${method} ${c.req.path} failed:`, e?.stack || e);
+      return c.json({ error: { message: e?.message || "Internal error", type: "server_error" } }, 500);
+    }
+    return res ?? c.json({ error: { message: "Empty response", type: "server_error" } }, 500);
   };
 }
 
@@ -354,6 +378,42 @@ register("/api", [
   ["POST", "/tunnel/tailscale-disable", () => apiTunnel("/tailscale-disable/route.js")],
   ["POST", "/tunnel/tailscale-enable", () => apiTunnel("/tailscale-enable/route.js")],
   ["POST", "/tunnel/tailscale-install", () => apiTunnel("/tailscale-install/route.js")],
+]);
+
+// ─── Admin group: auth (cookie flows run via the next-headers shim) ────────
+register("/api", [
+  ["POST", "/auth/login", () => apiAuth("/login/route.js")],
+  ["POST", "/auth/logout", () => apiAuth("/logout/route.js")],
+  ["GET", "/auth/status", () => apiAuth("/status/route.js")],
+  ["POST", "/auth/reset-password", () => apiAuth("/reset-password/route.js")],
+  ["GET", "/auth/oidc/start", () => apiAuth("/oidc/start/route.js")],
+  ["GET", "/auth/oidc/callback", () => apiAuth("/oidc/callback/route.js")],
+  ["POST", "/auth/oidc/test", () => apiAuth("/oidc/test/route.js")],
+  ["GET", "/auth/saml/metadata", () => apiAuth("/saml/metadata/route.js")],
+  ["GET", "/auth/saml/start", () => apiAuth("/saml/start/route.js")],
+  ["POST", "/auth/saml/acs", () => apiAuth("/saml/acs/route.js")],
+  ["POST", "/auth/saml/test", () => apiAuth("/saml/test/route.js")],
+]);
+
+// ─── Admin group: oauth (credential import endpoints) ──────────────────────
+register("/api", [
+  ["POST", "/oauth/codex/bulk-import", () => apiOauth("/codex/bulk-import/route.js")],
+  ["POST", "/oauth/codex/import-token", () => apiOauth("/codex/import-token/route.js")],
+  ["GET", "/oauth/cursor/auto-import", () => apiOauth("/cursor/auto-import/route.js")],
+  ["POST", "/oauth/cursor/import", () => apiOauth("/cursor/import/route.js")],
+  ["GET", "/oauth/cursor/import", () => apiOauth("/cursor/import/route.js")],
+  ["POST", "/oauth/gitlab/pat", () => apiOauth("/gitlab/pat/route.js")],
+  ["POST", "/oauth/grok-cli/bulk-import", () => apiOauth("/grok-cli/bulk-import/route.js")],
+  ["POST", "/oauth/iflow/cookie", () => apiOauth("/iflow/cookie/route.js")],
+  ["POST", "/oauth/kiro/api-key", () => apiOauth("/kiro/api-key/route.js")],
+  ["GET", "/oauth/kiro/auto-import", () => apiOauth("/kiro/auto-import/route.js")],
+  ["POST", "/oauth/kiro/import-cli-proxy", () => apiOauth("/kiro/import-cli-proxy/route.js")],
+  ["POST", "/oauth/kiro/import", () => apiOauth("/kiro/import/route.js")],
+  ["GET", "/oauth/kiro/social-authorize", () => apiOauth("/kiro/social-authorize/route.js")],
+  ["POST", "/oauth/kiro/social-exchange", () => apiOauth("/kiro/social-exchange/route.js")],
+  // Generic OAuth flow: /api/oauth/{provider}/{action}
+  ["GET", "/oauth/:provider/:action", () => apiOauth("/[provider]/[action]/route.js"), { params: ["provider", "action"] }],
+  ["POST", "/oauth/:provider/:action", () => apiOauth("/[provider]/[action]/route.js"), { params: ["provider", "action"] }],
 ]);
 
 // ─── Remaining Next rewrites, via internal re-dispatch ──────────────────────

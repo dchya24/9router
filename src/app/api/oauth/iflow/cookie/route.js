@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { createProviderConnection } from "@/models";
 
 /**
@@ -11,13 +10,13 @@ export async function POST(request) {
     const { cookie } = await request.json();
 
     if (!cookie || typeof cookie !== "string") {
-      return NextResponse.json({ error: "Cookie is required" }, { status: 400 });
+      return Response.json({ error: "Cookie is required" }, { status: 400 });
     }
 
     // Normalize cookie
     const trimmed = cookie.trim();
     if (!trimmed.includes("BXAuth=")) {
-      return NextResponse.json({ error: "Cookie must contain BXAuth field" }, { status: 400 });
+      return Response.json({ error: "Cookie must contain BXAuth field" }, { status: 400 });
     }
 
     let normalizedCookie = trimmed;
@@ -43,7 +42,7 @@ export async function POST(request) {
 
     if (!getResponse.ok) {
       const errorText = await getResponse.text();
-      return NextResponse.json(
+      return Response.json(
         { error: `Failed to fetch API key info: ${errorText}` },
         { status: getResponse.status }
       );
@@ -51,7 +50,7 @@ export async function POST(request) {
 
     const getResult = await getResponse.json();
     if (!getResult.success) {
-      return NextResponse.json(
+      return Response.json(
         { error: `API key fetch failed: ${getResult.message}` },
         { status: 400 }
       );
@@ -59,7 +58,7 @@ export async function POST(request) {
 
     const keyData = getResult.data;
     if (!keyData.name) {
-      return NextResponse.json({ error: "Missing name in API key info" }, { status: 400 });
+      return Response.json({ error: "Missing name in API key info" }, { status: 400 });
     }
 
     // Step 2: POST to refresh API key
@@ -81,7 +80,7 @@ export async function POST(request) {
 
     if (!postResponse.ok) {
       const errorText = await postResponse.text();
-      return NextResponse.json(
+      return Response.json(
         { error: `Failed to refresh API key: ${errorText}` },
         { status: postResponse.status }
       );
@@ -89,7 +88,7 @@ export async function POST(request) {
 
     const postResult = await postResponse.json();
     if (!postResult.success) {
-      return NextResponse.json(
+      return Response.json(
         { error: `API key refresh failed: ${postResult.message}` },
         { status: 400 }
       );
@@ -97,7 +96,7 @@ export async function POST(request) {
 
     const refreshedKey = postResult.data;
     if (!refreshedKey.apiKey) {
-      return NextResponse.json({ error: "Missing API key in response" }, { status: 400 });
+      return Response.json({ error: "Missing API key in response" }, { status: 400 });
     }
 
     // Extract only BXAuth from cookie
@@ -120,7 +119,7 @@ export async function POST(request) {
       isActive: true,
     });
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       connection: {
         id: connection.id,
@@ -132,6 +131,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error("iFlow cookie auth error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }
