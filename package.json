@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --port 20127",
     "dev:webpack": "next dev --webpack --port 20127",
-    "build": "next build --webpack",
+    "build": "NEXT_EXPORT=1 next build --webpack",
     "start": "node --import ./hono-server/register.mjs hono-server/server.js",
     "start:next-front": "NEXT_UPSTREAM=http://127.0.0.1:20128 node --import ./hono-server/register.mjs hono-server/server.js",
     "cli:pack": "npm --prefix cli run pack:cli",

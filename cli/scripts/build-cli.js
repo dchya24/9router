@@ -143,6 +143,7 @@ function buildCliPackage() {
         APPDATA: path.join(buildHomeDir, "AppData", "Roaming"),
         LOCALAPPDATA: path.join(buildHomeDir, "AppData", "Local"),
         NEXT_DIST_DIR: buildDistDirName,
+        NEXT_EXPORT: "1",
       }
     });
     console.log("✅ Static export build completed\n");

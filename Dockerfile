@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY . ./
 ENV NEXT_TELEMETRY_DISABLED=1
 # Static dashboard export (next.config.mjs output:"export") → out/
-RUN npx next build --webpack
+RUN NEXT_EXPORT=1 npx next build --webpack
 
 # ── Runner: production deps only (hono, jose, undici, better-sqlite3, …) ───
 FROM ${NODE_IMAGE} AS runner
