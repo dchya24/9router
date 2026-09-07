@@ -1,6 +1,7 @@
 "use client";
 
-import { useParams, notFound, useRouter } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
+import { usePathSegment } from "@/shared/hooks/usePathSegment";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card, Badge, Button, Toggle, AddCustomEmbeddingModal } from "@/shared/components";
@@ -138,7 +139,7 @@ function ComboList({ combos }) {
 }
 
 export default function MediaProviderKindPage() {
-  const { kind } = useParams();
+  const kind = usePathSegment(2); // /dashboard/media-providers/<kind>
   const router = useRouter();
   const [connections, setConnections] = useState([]);
   const [customNodes, setCustomNodes] = useState([]);

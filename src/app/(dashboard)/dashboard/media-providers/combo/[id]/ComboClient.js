@@ -1,6 +1,7 @@
 "use client";
 
-import { useParams, notFound, useRouter } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
+import { usePathSegment } from "@/shared/hooks/usePathSegment";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, Button, Input, Toggle, ModelSelectModal } from "@/shared/components";
@@ -45,7 +46,7 @@ function getListingHref(kind) {
 }
 
 export default function ComboDetailPage() {
-  const { id } = useParams();
+  const id = usePathSegment(3); // /dashboard/media-providers/combo/<id>
   const router = useRouter();
   const [combo, setCombo] = useState(null);
   const [loading, setLoading] = useState(true);

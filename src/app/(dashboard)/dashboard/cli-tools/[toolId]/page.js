@@ -1,9 +1,8 @@
-import { CLI_TOOLS } from "@/shared/constants/cliTools";
 import ToolDetailLoader from "./ToolDetailLoader";
 
-// Static export: dynamic routes must be enumerated at build time.
+// Client component — one shell placeholder; Hono serves it for any toolId.
 export function generateStaticParams() {
-  return Object.keys(CLI_TOOLS).map((toolId) => ({ toolId }));
+  return [{ toolId: "shell" }];
 }
 
 export default function ToolDetailPage() {

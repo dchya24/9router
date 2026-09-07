@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { usePathSegment } from "@/shared/hooks/usePathSegment";
 import { CLI_TOOLS } from "@/shared/constants/cliTools";
 import ToolDetailClient from "./ToolDetailClient";
 
 // Client loader for the static-exported [toolId] page: reads the tool id from
 // the URL, validates it, and fetches the machine id from /api/machine-id.
 export default function ToolDetailLoader() {
-  const params = useParams();
+  const toolId = usePathSegment(2); // /dashboard/cli-tools/<toolId>
   const [machineId, setMachineId] = useState(null);
 
   useEffect(() => {
@@ -18,7 +18,6 @@ export default function ToolDetailLoader() {
       .catch(() => setMachineId(""));
   }, []);
 
-  const toolId = params?.toolId;
   if (!toolId || !CLI_TOOLS[toolId]) {
     return <p style={{ padding: 24 }}>Unknown tool: {String(toolId)}</p>;
   }

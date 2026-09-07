@@ -1,6 +1,7 @@
 "use client";
 
-import { useParams, notFound, useRouter } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
+import { usePathSegment } from "@/shared/hooks/usePathSegment";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Card, Badge, Button, AddCustomEmbeddingModal, NoAuthProxyCard, ProviderInfoCard } from "@/shared/components";
@@ -16,7 +17,8 @@ import { SttExampleCard } from "./components/SttExampleCard";
 
 // MediaProviderDetailPage
 export default function MediaProviderDetailPage() {
-  const { kind, id } = useParams();
+  const kind = usePathSegment(2); // /dashboard/media-providers/<kind>/<id>
+  const id = usePathSegment(3);
   const router = useRouter();
   const kindConfig = MEDIA_PROVIDER_KINDS.find((k) => k.id === kind);
   const isCustom = isCustomEmbeddingProvider(id) && kind === "embedding";

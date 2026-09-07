@@ -41,13 +41,40 @@ export function createStaticHandler(exportDir) {
     return null; // no exported dashboard available
   }
 
+  // Dynamic-route shells: prerendered once with placeholder params ("shell"),
+  // then served for ANY param value. The client components read the real
+  // params from window.location (src/shared/hooks/usePathSegment.js), so the
+  // hydrated page matches the URL even though the HTML is a shared shell.
+  // [prefix, paramSegmentCount, shellFile]
+  const SHELL_ROUTES = [
+    ["/dashboard/media-providers/combo/", 1, "/dashboard/media-providers/combo/shell.html"],
+    ["/dashboard/media-providers/", 1, "/dashboard/media-providers/shell.html"],
+    ["/dashboard/media-providers/", 2, "/dashboard/media-providers/shell/shell.html"],
+    ["/dashboard/providers/", 1, "/dashboard/providers/shell.html"],
+    ["/dashboard/cli-tools/", 1, "/dashboard/cli-tools/shell.html"],
+  ];
+
+  const shellFor = (pathname) => {
+    for (const [prefix, paramCount, shell] of SHELL_ROUTES) {
+      if (!pathname.startsWith(prefix)) continue;
+      const segsAfter = pathname.slice(prefix.length).split("/").filter(Boolean);
+      if (segsAfter.length !== paramCount) continue;
+      const file = path.join(root, ...shell.split("/"));
+      if (fs.existsSync(file)) return file;
+    }
+    return null;
+  };
+
   const resolveFile = (pathname) => {
     const clean = path.normalize(pathname).replace(/^(\.\.[/\\])+/, "");
     const segs = clean.split("/").filter(Boolean);
     const candidates = [];
     candidates.push(path.join(root, ...segs));
     if (!segs.length || path.extname(segs[segs.length - 1] || "") === "") {
-      // extensionless route: try .html forms, then parent shells
+      // extensionless route: exact shell by pattern, then .html forms, then
+      // parent-shell trim as a last resort
+      const shell = shellFor(clean);
+      if (shell) return shell;
       if (segs.length) {
         candidates.push(path.join(root, ...segs) + ".html");
         candidates.push(path.join(root, ...segs, "index.html"));
