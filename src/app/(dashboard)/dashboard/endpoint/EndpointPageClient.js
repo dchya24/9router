@@ -23,6 +23,11 @@ export default function APIPageClient({ machineId }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [createdKey, setCreatedKey] = useState(null);
+  // Fork feature: per-key allowed-model selection (create + edit modals)
+  const [newKeyModels, setNewKeyModels] = useState([]);
+  const [restrictions, setRestrictions] = useState({});
+  const [editRestrictions, setEditRestrictions] = useState(null); // { keyId, keyName, patterns[] }
+  const [availableModels, setAvailableModels] = useState([]);
   const [confirmState, setConfirmState] = useState(null);
 
   const [requireApiKey, setRequireApiKey] = useState(false);
@@ -275,6 +280,23 @@ export default function APIPageClient({ machineId }) {
         } catch { /* fall through to empty render */ }
       }
       setKeys(existing);
+      // Fork: load per-key model restrictions + model catalog for the pickers
+      try {
+        const [resRestrictions, resModels] = await Promise.all([
+          fetch("/api/key-models"),
+          fetch("/v1/models"),
+        ]);
+        if (resRestrictions.ok) {
+          const data = await resRestrictions.json();
+          setRestrictions(
+            Object.fromEntries((data.restrictions || []).map((r) => [r.keyId, r.patterns || []]))
+          );
+        }
+        if (resModels.ok) {
+          const data = await resModels.json();
+          setAvailableModels((data.data || []).map((m) => m.id));
+        }
+      } catch { /* restrictions UI degrades gracefully */ }
     } catch (error) {
       console.log("Error fetching data:", error);
     } finally {
@@ -634,13 +656,42 @@ export default function APIPageClient({ machineId }) {
       const data = await res.json();
 
       if (res.ok) {
+        // Fork: apply the selected allowed-models restriction to the new key
+        if (newKeyModels.length > 0 && data.id) {
+          try {
+            await fetch("/api/key-models", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ keyId: data.id, patterns: newKeyModels }),
+            });
+          } catch { /* key works unrestricted if this fails */ }
+        }
         setCreatedKey(data.key);
         await fetchData();
         setNewKeyName("");
+        setNewKeyModels([]);
         setShowAddModal(false);
       }
     } catch (error) {
       console.log("Error creating key:", error);
+    }
+  };
+
+  // Fork: save edited restrictions for an existing key
+  const handleSaveRestrictions = async () => {
+    if (!editRestrictions) return;
+    try {
+      const res = await fetch("/api/key-models", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyId: editRestrictions.keyId, patterns: editRestrictions.patterns }),
+      });
+      if (res.ok) {
+        setRestrictions((r) => ({ ...r, [editRestrictions.keyId]: editRestrictions.patterns }));
+        setEditRestrictions(null);
+      }
+    } catch (error) {
+      console.log("Error saving restrictions:", error);
     }
   };
 
@@ -653,6 +704,8 @@ export default function APIPageClient({ machineId }) {
         try {
           const res = await fetch(`/api/keys/${id}`, { method: "DELETE" });
           if (res.ok) {
+            // Fork: drop this key's model restriction too
+            fetch(`/api/key-models?keyId=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
             setKeys(keys.filter((k) => k.id !== id));
             setVisibleKeys(prev => {
               const next = new Set(prev);
@@ -1042,8 +1095,32 @@ export default function APIPageClient({ machineId }) {
                   {key.isActive === false && (
                     <p className="text-xs text-orange-500 mt-1">Paused</p>
                   )}
+                  {/* Fork: per-key model restriction badge */}
+                  <p className="text-xs mt-1">
+                    {(restrictions[key.id] || []).length > 0 ? (
+                      <span className="text-amber-500">
+                        Allowed models: {(restrictions[key.id] || []).join(", ")}
+                      </span>
+                    ) : (
+                      <span className="text-text-muted">All models allowed</span>
+                    )}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Fork: edit allowed models */}
+                  <button
+                    onClick={() =>
+                      setEditRestrictions({
+                        keyId: key.id,
+                        keyName: key.name,
+                        patterns: [...(restrictions[key.id] || [])],
+                      })
+                    }
+                    className="p-2 hover:bg-primary/10 rounded text-primary opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                    title="Allowed models"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">tune</span>
+                  </button>
                   <Toggle
                     size="sm"
                     checked={key.isActive ?? true}
@@ -1083,6 +1160,7 @@ export default function APIPageClient({ machineId }) {
         onClose={() => {
           setShowAddModal(false);
           setNewKeyName("");
+          setNewKeyModels([]);
         }}
       >
         <div className="flex flex-col gap-4">
@@ -1092,6 +1170,39 @@ export default function APIPageClient({ machineId }) {
             onChange={(e) => setNewKeyName(e.target.value)}
             placeholder="Production Key"
           />
+          {/* Fork: allowed models picker (multi-select; empty = all models) */}
+          <div>
+            <p className="text-sm font-medium mb-1">Allowed Models</p>
+            <p className="text-xs text-text-muted mb-2">
+              Leave empty to allow all models. Selected models are matched by exact id.
+            </p>
+            {availableModels.length > 0 ? (
+              <div className="max-h-44 overflow-y-auto border border-black/10 dark:border-white/10 rounded-lg p-2 flex flex-col gap-1">
+                {availableModels.map((model) => (
+                  <label key={model} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded px-1 py-0.5">
+                    <input
+                      type="checkbox"
+                      checked={newKeyModels.includes(model)}
+                      onChange={(e) => {
+                        setNewKeyModels((prev) =>
+                          e.target.checked ? [...prev, model] : prev.filter((m) => m !== model)
+                        );
+                      }}
+                      className="accent-current"
+                    />
+                    <span className="font-mono text-xs">{model}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-text-muted">Model list unavailable — the key will be created unrestricted.</p>
+            )}
+            {newKeyModels.length > 0 && (
+              <p className="text-xs mt-2">
+                {newKeyModels.length} model{newKeyModels.length > 1 ? "s" : ""} allowed
+              </p>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button onClick={handleCreateKey} fullWidth disabled={!newKeyName.trim()}>
               Create
@@ -1100,10 +1211,61 @@ export default function APIPageClient({ machineId }) {
               onClick={() => {
                 setShowAddModal(false);
                 setNewKeyName("");
+                setNewKeyModels([]);
               }}
               variant="ghost"
               fullWidth
             >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Fork: Allowed Models editor for an existing key */}
+      <Modal
+        isOpen={!!editRestrictions}
+        title={`Allowed Models — ${editRestrictions?.keyName || ""}`}
+        onClose={() => setEditRestrictions(null)}
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-text-muted">
+            Exact model ids. Leave all unchecked to allow every model. Calls to
+            other models return 403.
+          </p>
+          {availableModels.length > 0 ? (
+            <div className="max-h-56 overflow-y-auto border border-black/10 dark:border-white/10 rounded-lg p-2 flex flex-col gap-1">
+              {availableModels.map((model) => (
+                <label key={model} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded px-1 py-0.5">
+                  <input
+                    type="checkbox"
+                    checked={editRestrictions?.patterns?.includes(model) || false}
+                    onChange={(e) => {
+                      setEditRestrictions((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              patterns: e.target.checked
+                                ? [...prev.patterns, model]
+                                : prev.patterns.filter((m) => m !== model),
+                            }
+                          : prev
+                      );
+                    }}
+                    className="accent-current"
+                  />
+                  <span className="font-mono text-xs">{model}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-text-muted">Model list unavailable.</p>
+          )}
+          <div className="flex gap-2">
+            <Button onClick={handleSaveRestrictions} fullWidth>
+              Save
+            </Button>
+            <Button onClick={() => setEditRestrictions(null)} variant="ghost" fullWidth>
               Cancel
             </Button>
           </div>
