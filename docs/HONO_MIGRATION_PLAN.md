@@ -1,6 +1,40 @@
 # Hono Migration Plan — Proxy API on bare Node
 
 _Status: **Phase 4 complete (2026-09-04)** — single-process Hono deployment,
+
+## Upstream sync workflow (fork maintenance)
+
+This fork tracks `decolua/9router` (`git remote add upstream https://github.com/decolua/9router.git`).
+First proven sync: v0.5.65 → v0.5.69 (19 commits, 2026-09-07).
+
+```bash
+git fetch upstream
+git checkout -b sync/upstream-vX
+git merge upstream/master
+# conflicts concentrate in: Dockerfile (keep ours), src/routes/** route files
+#   (keep upstream logic, drop next/server imports, re-run the codemod below)
+node --input-type=module -e "…codemod: strip next/server import, NextResponse.json -> Response.json across src/routes…"   # see git history
+# new/changed upstream tests may reference the old path:
+#   sed -i 's|src/app/api/|src/routes/|g' <test file>
+cd tests && bun install && bunx vitest run --exclude '**/*.concurrent.test.js'
+# regenerate version-dependent snapshots if the release bump changes User-Agent:
+bunx vitest run translator/golden-url-header.test.js -u
+npm run build && NINEROUTER_DISABLE_MITM=1 PORT=20128 npm start   # smoke
+git checkout master && git merge --ff-only sync/upstream-vX && git push origin master
+```
+
+Workflow notes from the first run:
+- **git rename detection does most of the work**: upstream edits to
+  `src/app/api/**` auto-merged into the relocated `src/routes/**`. Only 2
+  conflicts in 63 changed files.
+- **When smoke-testing after a sync, kill the old server process
+  deterministically** — `fuser -k <port>/tcp` can silently fail and the stale
+  pre-merge process keeps answering on the port (masks the merge as "not
+  applied"). Kill by /proc scan for node processes whose cmdline contains
+  `hono-server/server.js`.
+- The release bump changes `User-Agent`, so `golden-url-header` snapshots
+  need `-u` regeneration once per sync.
+
 Docker image rebuilt and E2E-verified. Remaining (optional): merge branch,
 CLI smoke test on real hardware, multi-user auth feature._
 
