@@ -4,6 +4,8 @@ ARG NODE_IMAGE=node:22-alpine
 # ── Builder: full deps (Next + React are devDependencies) → static export ──
 FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
+# CN mirror for apk (used by builder and runner stages)
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
 
 COPY package.json bun.lock ./
 RUN --mount=type=cache,target=/root/.npm \

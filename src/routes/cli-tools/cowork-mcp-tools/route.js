@@ -1,5 +1,7 @@
 "use server";
 
+import { assertPublicUrl } from "@/shared/utils/ssrfGuard.js";
+import { isLocalRequest } from "@/dashboardGuard";
 
 const TIMEOUT_MS = 8000;
 
@@ -85,6 +87,14 @@ export async function POST(request) {
     const { url } = await request.json();
     if (!url || typeof url !== "string") {
       return Response.json({ error: "url required" }, { status: 400 });
+    }
+    // SSRF guard for remote callers; local host keeps self-hosted MCP servers.
+    if (!isLocalRequest(request)) {
+      try {
+        assertPublicUrl(url);
+      } catch {
+        return Response.json({ error: "URL not allowed" }, { status: 400 });
+      }
     }
     const result = await probeMcp(url);
     return Response.json(result);
