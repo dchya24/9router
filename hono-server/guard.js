@@ -11,6 +11,11 @@ import { getSettings, validateApiKey } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { verifyDashboardAuthToken } from "@/lib/auth/dashboardSession";
 import { hasTrustedPeerHeaders } from "@/lib/auth/trustedPeer";
+import {
+  getKeyModelRestrictions,
+  findApiKeyIdByRawKey,
+  modelAllowed,
+} from "@/lib/db/repos/keyModelRestrictionsRepo.js";
 
 // Mirrors custom-server.js: per-process secret proving x-9r-real-ip was
 // stamped from the TCP socket rather than supplied by the client.
@@ -149,6 +154,45 @@ async function canAccessPublicLlmApi(request) {
   return await hasValidApiKey(request);
 }
 
+// ─── Fork feature: per-API-key model restrictions ──────────────────────────
+// Pattern matching lives in the fork repo module so it is unit-testable
+// (modelMatchesPattern / modelAllowed).
+function extractRequestedModel(request, pathname) {
+  // Gemini native: model lives in the path — /v1beta/models/<model>:action
+  const gemini = pathname.match(/\/models\/([^:]+):/);
+  if (gemini) return decodeURIComponent(gemini[1]);
+  return null; // JSON body peek is done by the caller (clone-based)
+}
+
+async function enforceKeyModelRestrictions(request, pathname) {
+  const rawKey = extractApiKey(request);
+  if (!rawKey) return null; // local / cli-token access carries no key → unrestricted
+
+  const keyId = await findApiKeyIdByRawKey(rawKey);
+  if (!keyId) return null;
+
+  const patterns = await getKeyModelRestrictions(keyId);
+  if (!patterns) return null;
+
+  let model = extractRequestedModel(request, pathname);
+  if (!model) {
+    const hasBody = !["GET", "HEAD"].includes(request.method);
+    if (hasBody) {
+      try {
+        const peek = await request.clone().json();
+        model = typeof peek?.model === "string" ? peek.model : null;
+      } catch { /* non-JSON body (multipart/form) — not restrictable here */ }
+    }
+  }
+  if (!model) return null;
+
+  if (modelAllowed(patterns, model)) return null;
+  return Response.json(
+    { error: { message: `Model "${model}" is not allowed for this API key`, type: "access_denied", code: "model_not_allowed" } },
+    { status: 403 }
+  );
+}
+
 async function canAccessLocalOnlyRoute(request) {
   if (await hasValidCliToken(request)) return true;
   if (isLocalRequest(request) && await isAuthenticated(request)) return true;
@@ -248,8 +292,12 @@ export function registerGuards(app) {
     }
 
     if (isPublicLlmApi(pathname)) {
-      if (await canAccessPublicLlmApi(c.req.raw)) return next();
-      return c.json({ error: "API key required for remote API access" }, 401);
+      if (!(await canAccessPublicLlmApi(c.req.raw))) {
+        return c.json({ error: "API key required for remote API access" }, 401);
+      }
+      const denied = await enforceKeyModelRestrictions(c.req.raw, pathname);
+      if (denied) return denied;
+      return next();
     }
 
     // Deny-by-default for /api/* — public allow-list bypasses, rest requires auth.

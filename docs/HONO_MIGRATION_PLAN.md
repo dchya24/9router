@@ -2,6 +2,37 @@
 
 _Status: **Phase 4 complete (2026-09-04)** — single-process Hono deployment,
 
+## Fork features (additive, zero upstream files edited)
+
+Pattern used for every fork feature: **new files only** plus edits to files the
+fork already owns (`hono-server/*`) or one-line additive entries in shared
+lists. Upstream files under `src/sse`, `open-sse`, `src/lib` stay untouched, so
+`git merge upstream/master` stays conflict-free.
+
+### Per-API-key model restrictions (2026-09-10)
+
+Restrict which models an API key may call, enforced on the whole LLM surface.
+
+| Piece | Path | Upstream? |
+| --- | --- | --- |
+| Storage (kv scope `keyModelRestrictions`) | `src/lib/db/repos/keyModelRestrictionsRepo.js` | new file |
+| Management API `/api/key-models` | `src/routes/key-models/route.js` | new file |
+| Enforcement | `hono-server/guard.js` (`enforceKeyModelRestrictions`) | fork-owned |
+| UI `/dashboard/keys` | `src/app/(dashboard)/dashboard/keys/page.js` | new file |
+| Nav entry | `src/shared/components/Sidebar.js` | +1 line |
+
+Semantics: **exact model id match** (`sm/gpt-4.1-nano`) — no implicit provider
+aliasing, so a pattern cannot silently grant access through another provider.
+A trailing `*` is an explicit opt-in glob (`sm/gpt-4.1-*`). Empty list =
+unrestricted. Rejected calls get `403 {code:"model_not_allowed"}` before any
+provider work happens. Both body `.model` and Gemini's path form
+(`/v1beta/models/<model>:action`) are checked; the body is peeked from a clone
+so the handler still receives a readable body.
+
+Enforcement lives in the guard (not in upstream `src/sse/services/auth.js`) on
+purpose: it is the only file the fork owns on the hot path, and it already
+runs before every `/v1` request.
+
 ## Upstream sync workflow (fork maintenance)
 
 This fork tracks `decolua/9router` (`git remote add upstream https://github.com/decolua/9router.git`).

@@ -477,6 +477,14 @@ register("/api", [
 // ─── Static-dashboard helper: machine id for client pages ──────────────────
 register("/api", [["GET", "/machine-id", () => apiMachineId("/route.js")]]);
 
+// ─── Fork feature: per-key model restrictions ──────────────────────────────
+// (path is /key-models — /keys/models would be shadowed by /keys/:id)
+register("/api", [
+  ["GET", "/key-models", () => loaderFor("key-models")("/route.js")],
+  ["PUT", "/key-models", () => loaderFor("key-models")("/route.js")],
+  ["DELETE", "/key-models", () => loaderFor("key-models")("/route.js")],
+]);
+
 // ─── Remaining Next rewrites, via internal re-dispatch ──────────────────────
 async function redispatch(c, newPath) {
   const url = new URL(c.req.url);
