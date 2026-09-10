@@ -17,6 +17,7 @@ import EndpointRow from "./components/EndpointRow";
 import StatusAlert from "./components/StatusAlert";
 import Tooltip from "./components/Tooltip";
 import SecurityWarning from "./components/SecurityWarning";
+import AllowedModelsPicker from "./components/AllowedModelsPicker"; // Fork: searchable allowed-models picker
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1177,30 +1178,13 @@ export default function APIPageClient({ machineId }) {
               Leave empty to allow all models. Selected models are matched by exact id.
             </p>
             {availableModels.length > 0 ? (
-              <div className="max-h-44 overflow-y-auto border border-black/10 dark:border-white/10 rounded-lg p-2 flex flex-col gap-1">
-                {availableModels.map((model) => (
-                  <label key={model} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded px-1 py-0.5">
-                    <input
-                      type="checkbox"
-                      checked={newKeyModels.includes(model)}
-                      onChange={(e) => {
-                        setNewKeyModels((prev) =>
-                          e.target.checked ? [...prev, model] : prev.filter((m) => m !== model)
-                        );
-                      }}
-                      className="accent-current"
-                    />
-                    <span className="font-mono text-xs">{model}</span>
-                  </label>
-                ))}
-              </div>
+              <AllowedModelsPicker
+                models={availableModels}
+                selected={newKeyModels}
+                onChange={setNewKeyModels}
+              />
             ) : (
               <p className="text-xs text-text-muted">Model list unavailable — the key will be created unrestricted.</p>
-            )}
-            {newKeyModels.length > 0 && (
-              <p className="text-xs mt-2">
-                {newKeyModels.length} model{newKeyModels.length > 1 ? "s" : ""} allowed
-              </p>
             )}
           </div>
           <div className="flex gap-2">
@@ -1234,30 +1218,13 @@ export default function APIPageClient({ machineId }) {
             other models return 403.
           </p>
           {availableModels.length > 0 ? (
-            <div className="max-h-56 overflow-y-auto border border-black/10 dark:border-white/10 rounded-lg p-2 flex flex-col gap-1">
-              {availableModels.map((model) => (
-                <label key={model} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 rounded px-1 py-0.5">
-                  <input
-                    type="checkbox"
-                    checked={editRestrictions?.patterns?.includes(model) || false}
-                    onChange={(e) => {
-                      setEditRestrictions((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              patterns: e.target.checked
-                                ? [...prev.patterns, model]
-                                : prev.patterns.filter((m) => m !== model),
-                            }
-                          : prev
-                      );
-                    }}
-                    className="accent-current"
-                  />
-                  <span className="font-mono text-xs">{model}</span>
-                </label>
-              ))}
-            </div>
+            <AllowedModelsPicker
+              models={availableModels}
+              selected={editRestrictions?.patterns || []}
+              onChange={(patterns) =>
+                setEditRestrictions((prev) => (prev ? { ...prev, patterns } : prev))
+              }
+            />
           ) : (
             <p className="text-xs text-text-muted">Model list unavailable.</p>
           )}
