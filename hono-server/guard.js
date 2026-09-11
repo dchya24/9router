@@ -193,6 +193,52 @@ async function enforceKeyModelRestrictions(request, pathname) {
   );
 }
 
+// ─── Fork: /v1/models filtered to the key's allowed models ─────────────────
+const MODELS_LIST_PATHS = new Set(["/v1/models", "/api/v1/models", "/v1beta/models"]);
+
+function isModelsListPath(pathname) {
+  return MODELS_LIST_PATHS.has(pathname) || MODELS_LIST_PATHS.has(pathname.replace(/\/+$/, ""));
+}
+
+// body is the parsed JSON of a models list; returns the filtered copy or null
+// when nothing should change.
+function filterModelsBody(patterns, pathname, body) {
+  if (!body) return null;
+  if (pathname.startsWith("/v1beta")) {
+    if (!Array.isArray(body.models)) return null;
+    const models = body.models.filter((m) =>
+      modelAllowed(patterns, String(m?.name || "").replace(/^models\//, ""))
+    );
+    return { ...body, models };
+  }
+  if (!Array.isArray(body.data)) return null;
+  const data = body.data.filter((m) => modelAllowed(patterns, String(m?.id || "")));
+  return { ...body, data };
+}
+
+async function filterModelsResponseIfNeeded(c, pathname, res) {
+  const rawKey = extractApiKey(c.req.raw);
+  if (!rawKey) return res; // local/keyless → unrestricted view
+  const keyId = await findApiKeyIdByRawKey(rawKey);
+  if (!keyId) return res;
+
+  const patterns = await getKeyModelRestrictions(keyId);
+  if (!patterns) return res; // unrestricted key → full catalog
+
+  try {
+    const body = await res.clone().json();
+    const filtered = filterModelsBody(patterns, pathname, body);
+    if (!filtered) return res;
+    const headers = new Headers(res.headers);
+    headers.delete("content-length");
+    // Hono: after await next() the context is finalized, so RETURNING a new
+    // response from middleware is ignored — must assign c.res directly.
+    c.res = Response.json(filtered, { status: res.status, headers });
+  } catch {
+    return res; // fail-open: the list is advisory, enforcement is on /chat
+  }
+}
+
 async function canAccessLocalOnlyRoute(request) {
   if (await hasValidCliToken(request)) return true;
   if (isLocalRequest(request) && await isAuthenticated(request)) return true;
@@ -297,6 +343,11 @@ export function registerGuards(app) {
       }
       const denied = await enforceKeyModelRestrictions(c.req.raw, pathname);
       if (denied) return denied;
+      if (isModelsListPath(pathname)) {
+        await next();
+        // Hono: the final response lives on c.res after next() (next() returns void)
+        return filterModelsResponseIfNeeded(c, pathname, c.res);
+      }
       return next();
     }
 

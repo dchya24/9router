@@ -29,6 +29,17 @@ provider work happens. Both body `.model` and Gemini's path form
 (`/v1beta/models/<model>:action`) are checked; the body is peeked from a clone
 so the handler still receives a readable body.
 
+**`/v1/models` reflects the restriction too**: for a restricted key, the
+models-list responses (`/v1/models`, `/api/v1/models`, Gemini
+`/v1beta/models`) are filtered down to the allowed patterns — clients see only
+what they can call. Implemented as a response post-processor in the guard
+(`filterModelsResponseIfNeeded`); unrestricted keys keep the full catalog.
+Hono gotcha this surfaced: after `await next()` the context is finalized, so a
+middleware must assign `c.res = newResponse` — returning a new Response from
+middleware is silently ignored. (The Gemini list is built from the static
+provider table, so its filtered contents differ from the dynamic `/v1`
+catalog.)
+
 Enforcement lives in the guard (not in upstream `src/sse/services/auth.js`) on
 purpose: it is the only file the fork owns on the hot path, and it already
 runs before every `/v1` request.
