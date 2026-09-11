@@ -83,6 +83,101 @@ $DATA_DIR/
 Host path: `$HOME/.9router/db/data.sqlite`
 Container path: `/app/data/db/data.sqlite`
 
+---
+
+# 🌍 VPS deployment
+
+The fork runs as a single small Node process — no Next.js server — so a VPS
+needs only Node 22 (or Docker) and a data directory. Because a VPS is
+internet-exposed, set `REQUIRE_API_KEY=true`, a strong `INITIAL_PASSWORD`, and
+a random `JWT_SECRET` before the first boot.
+
+## Option A — Docker
+
+```bash
+git clone https://github.com/dchya24/9router.git && cd 9router
+docker build -t 9router .
+
+# custom port: map host 8080 -> container 20128
+docker run -d --name 9router \
+  -p 8080:20128 \
+  -v /var/lib/9router:/app/data \
+  -e DATA_DIR=/app/data \
+  -e INITIAL_PASSWORD=<strong-password> \
+  -e JWT_SECRET=<openssl rand -hex 32> \
+  -e REQUIRE_API_KEY=true \
+  --restart unless-stopped \
+  9router
+```
+
+Or `docker-compose.yml`:
+
+```yaml
+services:
+  9router:
+    build: .
+    ports:
+      - "8080:20128"       # host:container — change 8080 to any port
+    volumes:
+      - /var/lib/9router:/app/data
+    environment:
+      DATA_DIR: /app/data
+      INITIAL_PASSWORD: <strong-password>
+      JWT_SECRET: <random>
+      REQUIRE_API_KEY: "true"
+    restart: unless-stopped
+```
+
+## Option B — from source (systemd)
+
+```bash
+# Node.js 22
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs
+
+git clone https://github.com/dchya24/9router.git /opt/9router && cd /opt/9router
+npm install
+NEXT_EXPORT=1 npm run build     # static dashboard -> out/
+npm prune --omit=dev            # runtime deps only
+```
+
+`/etc/systemd/system/9router.service` — custom port via `PORT`:
+
+```ini
+[Unit]
+Description=9Router (Hono)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/9router
+Environment=PORT=8080
+Environment=HOST=0.0.0.0
+Environment=DATA_DIR=/var/lib/9router
+Environment=NODE_ENV=production
+Environment=NINEROUTER_DISABLE_MITM=1
+Environment=INITIAL_PASSWORD=<strong-password>
+Environment=JWT_SECRET=<random>
+Environment=REQUIRE_API_KEY=true
+ExecStart=/usr/bin/node --import ./hono-server/register.mjs hono-server/server.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now 9router
+sudo ufw allow 8080/tcp    # only the app port + SSH
+```
+
+## How the custom port works
+
+- Source runs read `PORT` (default 20127) and `HOST` (default 0.0.0.0).
+- The container reads `PORT` (image default 20128); the simplest way to change
+  the public port is the host-side mapping `-p <host>:20128`.
+- HTTPS: put nginx/Caddy/Cloudflare in front and set `AUTH_COOKIE_SECURE=true`.
+
 ## Optional env vars
 
 | Variable | Default | Notes |
