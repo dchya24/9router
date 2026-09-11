@@ -5,9 +5,9 @@ one small Node process serves the dashboard (static export), all APIs, the
 LLM proxy surface, and the security guard. There is no Next.js server process
 and the Antigravity MITM is disabled by default (`NINEROUTER_DISABLE_MITM=1`).
 
-- Upstream image (unchanged behavior): [`decolua/9router`](https://hub.docker.com/r/decolua/9router)
-- This fork: build locally (below) or point CI at this repo — the image
-  layout and ports are identical, so the commands work for either.
+- Upstream image (pre-fork architecture): [`decolua/9router`](https://hub.docker.com/r/decolua/9router)
+- This fork (Hono single-process): `ghcr.io/dchya24/9router` — published by
+  CI on `v*` tags, or build locally (below).
 
 ---
 
@@ -297,8 +297,26 @@ server for dashboard development.
 ## Publish (automatic via CI)
 
 Push a git tag `v*` → GitHub Actions builds multi-platform (amd64+arm64) and
-pushes to the registry configured in `.github/workflows/docker-publish.yml`.
+pushes to **this fork's own GHCR** (no extra secrets — the built-in
+`GITHUB_TOKEN` is used):
 
 ```bash
-git tag v0.5.65-hono.1 && git push origin v0.5.65-hono.1
+git tag v0.5.69-hono.1 && git push origin v0.5.69-hono.1
+# → ghcr.io/dchya24/9router:0.5.69-hono.1 + :latest
+```
+
+> The first push creates the GHCR package as **private**. For anonymous
+> `docker pull`, flip it to public: repo page → Packages → 9router → Package
+> settings → Change visibility. On the VPS you can then simply
+> `docker pull ghcr.io/dchya24/9router:latest` instead of building.
+
+Then run on the VPS:
+
+```bash
+docker run -d --name 9router \
+  -p 8080:20128 \
+  -v /var/lib/9router:/app/data \
+  -e DATA_DIR=/app/data \
+  --restart unless-stopped \
+  ghcr.io/dchya24/9router:latest
 ```
