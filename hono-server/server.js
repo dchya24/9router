@@ -344,34 +344,46 @@ register("/api", [
 // ─── Admin batch: pxpipe, headroom, media-providers, tunnel ────────────────
 // pxpipe start/stop/restart/install and headroom/tunnel lifecycle POSTs spawn
 // or control host processes — registered here, never exercised in tests.
-register("/api", [
-  ["POST", "/pxpipe/health", () => apiPxpipe("/health/route.js")],
-  ["POST", "/pxpipe/install", () => apiPxpipe("/install/route.js")],
-  ["GET", "/pxpipe/logs", () => apiPxpipe("/logs/route.js")],
-  ["POST", "/pxpipe/restart", () => apiPxpipe("/restart/route.js")],
-  ["POST", "/pxpipe/start", () => apiPxpipe("/start/route.js")],
-  ["GET", "/pxpipe/stats", () => apiPxpipe("/stats/route.js")],
-  ["GET", "/pxpipe/status", () => apiPxpipe("/status/route.js")],
-  ["POST", "/pxpipe/stop", () => apiPxpipe("/stop/route.js")],
-]);
-register("/api", [
-  ["GET", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
-  ["POST", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
-  ["DELETE", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
-  ["POST", "/headroom/restart", () => apiHeadroom("/restart/route.js")],
-  ["POST", "/headroom/start", () => apiHeadroom("/start/route.js")],
-  ["GET", "/headroom/status", () => apiHeadroom("/status/route.js")],
-  ["POST", "/headroom/stop", () => apiHeadroom("/stop/route.js")],
-  // Reverse proxy to the headroom app (all methods; LOCAL_ONLY /headroom/start,
-  // /stop, /proxy paths are gated by the guard above).
-  ["GET", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-  ["POST", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-  ["PUT", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-  ["PATCH", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-  ["DELETE", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-  ["HEAD", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-  ["OPTIONS", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-]);
+//
+// Optional workload gates (fork feature; goal: smallest possible runtime).
+// When set to "1" the whole group is not even registered — modules never load
+// and the paths fall through to 404 without importing spawners, downloaders,
+// or DNS/mitm code:
+//   NINEROUTER_DISABLE_TUNNEL   /api/tunnel/*
+//   NINEROUTER_DISABLE_HEADROOM /api/headroom/*
+//   NINEROUTER_DISABLE_PXPIPE   /api/pxpipe/*
+if (process.env.NINEROUTER_DISABLE_PXPIPE !== "1") {
+  register("/api", [
+    ["POST", "/pxpipe/health", () => apiPxpipe("/health/route.js")],
+    ["POST", "/pxpipe/install", () => apiPxpipe("/install/route.js")],
+    ["GET", "/pxpipe/logs", () => apiPxpipe("/logs/route.js")],
+    ["POST", "/pxpipe/restart", () => apiPxpipe("/restart/route.js")],
+    ["POST", "/pxpipe/start", () => apiPxpipe("/start/route.js")],
+    ["GET", "/pxpipe/stats", () => apiPxpipe("/stats/route.js")],
+    ["GET", "/pxpipe/status", () => apiPxpipe("/status/route.js")],
+    ["POST", "/pxpipe/stop", () => apiPxpipe("/stop/route.js")],
+  ]);
+}
+if (process.env.NINEROUTER_DISABLE_HEADROOM !== "1") {
+  register("/api", [
+    ["GET", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
+    ["POST", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
+    ["DELETE", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
+    ["POST", "/headroom/restart", () => apiHeadroom("/restart/route.js")],
+    ["POST", "/headroom/start", () => apiHeadroom("/start/route.js")],
+    ["GET", "/headroom/status", () => apiHeadroom("/status/route.js")],
+    ["POST", "/headroom/stop", () => apiHeadroom("/stop/route.js")],
+    // Reverse proxy to the headroom app (all methods; LOCAL_ONLY /headroom/start,
+    // /stop, /proxy paths are gated by the guard above).
+    ["GET", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+    ["POST", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+    ["PUT", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+    ["PATCH", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+    ["DELETE", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+    ["HEAD", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+    ["OPTIONS", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
+  ]);
+}
 register("/api", [
   ["GET", "/media-providers/tts/voices", () => apiMedia("/tts/voices/route.js")],
   ["GET", "/media-providers/tts/deepgram/voices", () => apiMedia("/tts/deepgram/voices/route.js")],
@@ -379,15 +391,17 @@ register("/api", [
   ["GET", "/media-providers/tts/inworld/voices", () => apiMedia("/tts/inworld/voices/route.js")],
   ["GET", "/media-providers/tts/minimax/voices", () => apiMedia("/tts/minimax/voices/route.js")],
 ]);
-register("/api", [
-  ["POST", "/tunnel/disable", () => apiTunnel("/disable/route.js")],
-  ["POST", "/tunnel/enable", () => apiTunnel("/enable/route.js")],
-  ["GET", "/tunnel/status", () => apiTunnel("/status/route.js")],
-  ["GET", "/tunnel/tailscale-check", () => apiTunnel("/tailscale-check/route.js")],
-  ["POST", "/tunnel/tailscale-disable", () => apiTunnel("/tailscale-disable/route.js")],
-  ["POST", "/tunnel/tailscale-enable", () => apiTunnel("/tailscale-enable/route.js")],
-  ["POST", "/tunnel/tailscale-install", () => apiTunnel("/tailscale-install/route.js")],
-]);
+if (process.env.NINEROUTER_DISABLE_TUNNEL !== "1") {
+  register("/api", [
+    ["POST", "/tunnel/disable", () => apiTunnel("/disable/route.js")],
+    ["POST", "/tunnel/enable", () => apiTunnel("/enable/route.js")],
+    ["GET", "/tunnel/status", () => apiTunnel("/status/route.js")],
+    ["GET", "/tunnel/tailscale-check", () => apiTunnel("/tailscale-check/route.js")],
+    ["POST", "/tunnel/tailscale-disable", () => apiTunnel("/tailscale-disable/route.js")],
+    ["POST", "/tunnel/tailscale-enable", () => apiTunnel("/tailscale-enable/route.js")],
+    ["POST", "/tunnel/tailscale-install", () => apiTunnel("/tailscale-install/route.js")],
+  ]);
+}
 
 // ─── Admin group: auth (cookie flows run via the next-headers shim) ────────
 register("/api", [
@@ -547,7 +561,14 @@ if (NEXT_UPSTREAM) {
   const exportDir = process.env.DASHBOARD_EXPORT_DIR || "out";
   const staticHandler = createStaticHandler(exportDir);
   if (staticHandler) {
-    app.notFound(staticHandler);
+    app.notFound((c) => {
+      // No API route matched (e.g. a group disabled via NINEROUTER_DISABLE_*)
+      // → JSON 404. The static shell fallback applies to dashboard pages only.
+      if (c.req.path.startsWith("/api/")) {
+        return c.json({ error: { message: "Not found", type: "invalid_request_error" } }, 404);
+      }
+      return staticHandler(c);
+    });
   } else {
     app.notFound((c) => c.json({ error: { message: "Not found", type: "invalid_request_error" } }, 404));
   }

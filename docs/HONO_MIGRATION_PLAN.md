@@ -9,6 +9,26 @@ fork already owns (`hono-server/*`) or one-line additive entries in shared
 lists. Upstream files under `src/sse`, `open-sse`, `src/lib` stay untouched, so
 `git merge upstream/master` stays conflict-free.
 
+### Workload gates: tunnel / headroom / pxpipe (2026-09-17)
+
+Same pattern as `NINEROUTER_DISABLE_MITM`, for deployments that never use the
+side-process surfaces. Each flag removes its group from registration entirely
+— modules (spawners, cloudflared downloader, DNS/mitm code) never load, and
+the paths fall through to the `/api/*` JSON 404 instead of the dashboard
+shell (the static handler only applies to non-`/api` paths):
+
+- `NINEROUTER_DISABLE_TUNNEL=1` — `/api/tunnel/*`. Also skips tunnel/tailscale
+  auto-resume, the cloudflared ensure/download, and the 60s watchdog +
+  network-monitor intervals in `initializeApp` (which are otherwise gated on
+  `settings.tunnelEnabled/tailscaleEnabled`).
+- `NINEROUTER_DISABLE_HEADROOM=1` — `/api/headroom/*` including the reverse
+  proxy catch-all. The `HEADROOM_URL` sidecar integration keeps working when
+  enabled; the flag only removes the local spawn/proxy surface.
+- `NINEROUTER_DISABLE_PXPIPE=1` — `/api/pxpipe/*` (install/loader/stats/logs).
+
+All three default to `1` in the Docker image. Verified: 9 gated paths return
+404 JSON, 5 control APIs + `/v1/models` + authed dashboard stay 200.
+
 ### Per-API-key model restrictions (2026-09-10)
 
 Restrict which models an API key may call, enforced on the whole LLM surface.

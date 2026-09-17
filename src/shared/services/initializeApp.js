@@ -36,6 +36,12 @@ process.setMaxListeners(20);
 // tunnel watchdogs (e.g. the Hono single-process container). Skips MITM
 // auto-start, DNS restores/cleanup, and spawns nothing at boot.
 export const MITM_DISABLED = process.env.NINEROUTER_DISABLE_MITM === "1";
+// Optional workload gates (fork feature; goals: smallest runtime + no spawns).
+// NINEROUTER_DISABLE_TUNNEL skips tunnel/tailscale resume, cloudflared
+// ensure/download, and the monitoring intervals.
+export const TUNNEL_DISABLED = process.env.NINEROUTER_DISABLE_TUNNEL === "1";
+// NINEROUTER_DISABLE_HEADROOM / NINEROUTER_DISABLE_PXPIPE are handled at
+// registration time in hono-server/server.js (modules never load).
 
 // Defer heavy startup work so the first HTTP request (login → dashboard) isn't
 // starved by DB cleanup, cloudflared download, lsof/DNS probes and OAuth pings.
@@ -64,7 +70,7 @@ export async function initializeApp() {
           try { removeAllDNSEntriesSync(); } catch { /* best effort */ }
         }
         try { killAllBridges(); } catch { /* best effort */ }
-        if (!MITM_DISABLED) killCloudflared();
+        if (!MITM_DISABLED || !TUNNEL_DISABLED) killCloudflared();
         process.exit();
       };
       process.on("SIGINT", cleanup);
@@ -91,20 +97,22 @@ async function runHeavyStartup() {
   const settings = await getSettings();
 
   // Auto-resume tunnel (once per process)
-  if (settings.tunnelEnabled && !g.tunnelAutoResumed) {
+  if (TUNNEL_DISABLED) {
+    console.log("[InitApp] Tunnel disabled via NINEROUTER_DISABLE_TUNNEL=1 — skipping resume, ensure, and monitoring");
+  } else if (settings.tunnelEnabled && !g.tunnelAutoResumed) {
     g.tunnelAutoResumed = true;
     console.log("[InitApp] Tunnel was enabled, auto-resuming...");
     safeRestartTunnel("startup").catch((e) => console.log("[InitApp] Tunnel resume failed:", e.message));
   }
 
   // Auto-resume tailscale (once per process)
-  if (settings.tailscaleEnabled && !g.tailscaleAutoResumed) {
+  if (!TUNNEL_DISABLED && settings.tailscaleEnabled && !g.tailscaleAutoResumed) {
     g.tailscaleAutoResumed = true;
     console.log("[InitApp] Tailscale was enabled, auto-resuming...");
     safeRestartTailscale("startup").catch((e) => console.log("[InitApp] Tailscale resume failed:", e.message));
   }
 
-  if (settings.tunnelEnabled) ensureCloudflared().catch(() => {});
+  if (!TUNNEL_DISABLED && settings.tunnelEnabled) ensureCloudflared().catch(() => {});
 
   if (MITM_DISABLED) {
     console.log("[InitApp] MITM disabled via NINEROUTER_DISABLE_MITM=1 — skipping auto-start and DNS sync");
@@ -114,7 +122,7 @@ async function runHeavyStartup() {
     autoStartMitm(settings);
   }
 
-  configureTunnelMonitoring(settings);
+  if (!TUNNEL_DISABLED) configureTunnelMonitoring(settings);
 
   if (hasQuotaAutoPingEnabled(settings)) {
     import("@/shared/services/quotaAutoPing")
