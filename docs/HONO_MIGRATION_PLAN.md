@@ -29,6 +29,18 @@ shell (the static handler only applies to non-`/api` paths):
 All three default to `1` in the Docker image. Verified: 9 gated paths return
 404 JSON, 5 control APIs + `/v1/models` + authed dashboard stay 200.
 
+### Usage retention service (2026-09-18)
+
+`hono-server/retention.js` (new file; upstream `src/` untouched), started from
+`hono-server/server.js`. `usageHistory` grows one row per request with no
+expiry upstream — the service deletes `usageHistory`/`requestDetails` rows
+older than `NINEROUTER_RETENTION_DAYS` (default 90) plus stale `usageDaily`
+days, in batches (default 5000), and `VACUUM`s only when rows were deleted
+and the freelist is ≥ 64 MB (`NINEROUTER_RETENTION_VACUUM_MIN_BYTES`).
+Runs 30 s after boot then every 24 h on `unref`'d timers; kill switch
+`NINEROUTER_DISABLE_RETENTION=1`. Tests: `tests/unit/retention.test.js`
+(12 tests, fake adapter).
+
 ### Per-API-key model restrictions (2026-09-10)
 
 Restrict which models an API key may call, enforced on the whole LLM surface.

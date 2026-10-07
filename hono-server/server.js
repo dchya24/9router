@@ -594,6 +594,24 @@ if (process.env.NINEROUTER_DISABLE_BG_REFRESH !== "1") {
   }
 }
 
+// ─── Usage retention (fork feature; time-based expiry for observability tables)
+// requestDetails is count-pruned but usageHistory grows one row per request
+// with no expiry — on a busy gateway the live DB grows without bound.
+// DD-only surface: config + prune logic live in ./retention.js; upstream
+// route/src files stay untouched. NINEROUTER_DISABLE_RETENTION=1 skips it.
+try {
+  const { startRetention, stopRetention } = await import("./retention.js");
+  startRetention();
+  process.once("SIGINT", () => {
+    try { stopRetention(); } catch { /* ignore */ }
+  });
+  process.once("SIGTERM", () => {
+    try { stopRetention(); } catch { /* ignore */ }
+  });
+} catch (e) {
+  console.error("[hono] retention failed to start:", e?.message || e);
+}
+
 // ─── Instrumentation parity (src/instrumentation.js register()) ─────────────
 // Console-log capture feeds /api/translator/console-logs; the catalog override
 // + sync back open-sse capabilities used by /v1/models.
