@@ -8,7 +8,7 @@
 import crypto from "node:crypto";
 import { getSettings, validateApiKey } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
-import { verifyDashboardAuthToken } from "@/lib/auth/dashboardSession";
+import { verifyDashboardAuthToken, getDashboardAuthSession } from "@/lib/auth/dashboardSession";
 import { hasTrustedPeerHeaders } from "@/lib/auth/trustedPeer";
 import {
   getKeyModelRestrictions,
@@ -259,6 +259,17 @@ async function hasValidToken(request) {
   return await verifyDashboardAuthToken(readCookie(request, "auth_token"));
 }
 
+// Fork: multi-user roles. Viewer sessions (JWT role claim = "viewer") get
+// read-only access to the admin API — mutating /api/* methods are rejected.
+// Logout stays open so a viewer can end their own session. Legacy
+// shared-password tokens carry no role and remain fully privileged.
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+function viewerBlocked(method, pathname) {
+  if (!MUTATING_METHODS.has(method)) return false;
+  if (!pathname.startsWith("/api/")) return false;
+  return pathname !== "/api/auth/logout" && pathname !== "/api/auth/login";
+}
+
 // Read settings directly from DB to avoid self-fetch deadlock in middleware
 async function loadSettings() {
   try {
@@ -354,6 +365,14 @@ export function registerGuards(app) {
     if (pathname.startsWith("/api/")) {
       if (isPublicApi(pathname)) return next();
       if (await hasValidCliToken(c.req.raw) || await isAuthenticated(c.req.raw)) {
+        // Fork: viewers are read-only on the admin API surface. Legacy
+        // shared-password tokens carry no role claim and stay privileged.
+        if (viewerBlocked(c.req.method, pathname)) {
+          const session = await getDashboardAuthSession(readCookie(c.req.raw, "auth_token"));
+          if (session?.role === "viewer") {
+            return c.json({ error: "Forbidden: viewer role is read-only." }, 403);
+          }
+        }
         return next();
       }
       return c.json({ error: "Unauthorized" }, 401);

@@ -18,6 +18,10 @@ export default function LoginPage() {
   const [samlLoginLabel, setSamlLoginLabel] = useState("Sign in with SAML SSO");
   const [mustChange, setMustChange] = useState(false);
   const [newPassword, setNewPassword] = useState("");
+  // Fork: multi-user auth (hono-server/users.js) — username field appears
+  // when /api/auth/status reports multiUser: true.
+  const [username, setUsername] = useState("");
+  const [multiUser, setMultiUser] = useState(false);
 
   // Countdown for rate-limit
   useEffect(() => {
@@ -51,6 +55,7 @@ export default function LoginPage() {
           setOidcLoginLabel(data.oidcLoginLabel || "Sign in with OIDC");
           setSamlConfigured(data.samlConfigured === true);
           setSamlLoginLabel(data.samlLoginLabel || "Sign in with SAML SSO");
+          setMultiUser(data.multiUser === true); // Fork: multi-user auth
         } else {
           // Safe fallback on non-OK response to avoid infinite loading state.
           setHasPassword(true);
@@ -73,7 +78,8 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        // Fork: multi-user auth — send username alongside the password.
+        body: JSON.stringify({ username: multiUser ? username : undefined, password }),
       });
 
       if (res.ok) {
@@ -217,6 +223,21 @@ export default function LoginPage() {
                   </p>
                 )}
 
+                {/* Fork: multi-user auth — username field (users-mode only). */}
+                {multiUser && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium">Username</label>
+                    <Input
+                      type="text"
+                      placeholder="Enter username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                      autoFocus={!oidcAvailable}
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Password</label>
                   <Input
@@ -225,7 +246,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    autoFocus={!oidcAvailable}
+                    autoFocus={!multiUser && !oidcAvailable}
                   />
                   {error && <p className="text-xs text-red-500">{error}</p>}
                   {retryAfter > 0 && (
@@ -250,9 +271,11 @@ export default function LoginPage() {
                   {retryAfter > 0 ? `Wait ${retryAfter}s` : "Login"}
                 </Button>
 
-                <p className="text-xs text-center text-text-muted mt-2">
-                  Default password is <code className="bg-sidebar px-1 rounded">123456</code>
-                </p>
+                {!multiUser && (
+                  <p className="text-xs text-center text-text-muted mt-2">
+                    Default password is <code className="bg-sidebar px-1 rounded">123456</code>
+                  </p>
+                )}
                 {hasPassword === false && (
                   <p className="text-xs text-center text-amber-600 dark:text-amber-400">
                     Security risk: no password set. You will be asked to set one when logging in remotely.

@@ -188,6 +188,8 @@ sudo ufw allow 8080/tcp    # only the app port + SSH
 | `INITIAL_PASSWORD` | unset | pre-set the first dashboard password |
 | `JWT_SECRET` | generated to `$DATA_DIR/jwt-secret` | set for multi-replica sharing |
 | `REQUIRE_API_KEY` | `false` | require an API key for the `/v1` surface |
+| `INITIAL_ADMIN_USER` / `INITIAL_ADMIN_PASSWORD` | unset | create the first multi-user admin at boot (idempotent); once ≥1 user AND ≥1 admin exist, dashboard login requires username+password |
+| `NINEROUTER_DISABLE_MULTI_USER` | unset | set `1` to disable the multi-user layer entirely (shared-password login only) |
 | `NINEROUTER_DISABLE_MITM` | `1` (in image) | hard-off Antigravity MITM; remove to enable |
 | `NINEROUTER_DISABLE_BG_REFRESH` | unset | set `1` to skip OAuth token refresh scheduler |
 

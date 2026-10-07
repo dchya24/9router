@@ -25,6 +25,7 @@ import { registerGuards } from "./guard.js";
 import { runWithRequest } from "./shims/next-headers.mjs";
 import { createStaticHandler } from "./static.js";
 import { createWrappingServer } from "./peer-server.js";
+import { registerUserAuth, initUserAuth } from "./users.js";
 
 const PORT = Number(process.env.PORT || 20127);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -122,6 +123,12 @@ function register(prefix, routes) {
     app.on(method, prefix + path, on(method, mod, opts));
   }
 }
+
+// ─── Multi-user auth (fork feature) ──────────────────────────────────────────
+// Must register BEFORE the upstream route table so the fork login/status
+// handlers take precedence; with zero users they delegate 1:1 to upstream.
+registerUserAuth(app, { on, api: apiAuth });
+initUserAuth().catch(() => {});
 
 const V1_ROUTES = [
   ["OPTIONS", "/chat/completions", () => v1("/chat/completions/route.js")],

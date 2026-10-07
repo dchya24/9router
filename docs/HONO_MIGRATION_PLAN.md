@@ -41,6 +41,48 @@ Runs 30 s after boot then every 24 h on `unref`'d timers; kill switch
 `NINEROUTER_DISABLE_RETENTION=1`. Tests: `tests/unit/retention.test.js`
 (12 tests, fake adapter).
 
+### Multi-user dashboard auth (2026-10-07)
+
+Username/password users layered on top of the shared password, entirely in
+the fork layer (upstream `src/` untouched except `Fork:`-marked login-page
+blocks). `hono-server/users.js` owns an isolated `dashboardUsers` SQLite
+table (created via the adapter, never via upstream `schema.js/migrate.js`)
+with bcrypt hashes and `admin`|`viewer` roles.
+
+| Piece | Path | Upstream? |
+| --- | --- | --- |
+| Service (storage, validation, CRUD, bootstrap) | `hono-server/users.js` | fork-owned |
+| Login/status + `/api/users` CRUD registration | `hono-server/users.js` → wired in `hono-server/server.js` **before** the route table | fork-owned |
+| Viewer read-only enforcement | `hono-server/guard.js` (`viewerBlocked`) | fork-owned |
+| Login page username field | `src/app/login/page.js` | `Fork:`-marked blocks |
+
+Behavior:
+- **Zero users (or zero admins) = zero change**: the fork login handler
+  delegates 1:1 to the upstream handler (rate limiting, SSO modes,
+  must-change-password flow intact). The zero-admin state is the lockout
+  escape hatch — shared-password login comes back if every admin is gone.
+- With ≥1 user AND ≥1 admin, login requires `{username, password}`;
+  password-only logins are rejected. JWTs carry `sub`/`role` claims
+  (`createDashboardAuthToken` was already generic).
+- `viewer` role: GET/HEAD-only on `/api/*` (logout excepted), enforced in
+  the guard; `/api/users` is admin-only. Legacy shared-password tokens have
+  no role claim and stay fully privileged.
+- Admin CRUD: `GET/POST /api/users`, `PATCH/DELETE /api/users/:id`;
+  the last admin cannot be deleted or demoted. Username 3–32
+  `[a-zA-Z0-9_.-]`, password ≥ 8.
+- Bootstrap: `INITIAL_ADMIN_USER` + `INITIAL_ADMIN_PASSWORD` create the
+  first admin at boot (idempotent). Kill switch:
+  `NINEROUTER_DISABLE_MULTI_USER=1` (fork routes never register).
+- `/api/auth/status` gains `multiUser: true|false` (fork handler wraps the
+  upstream response); the login page shows the username field only then.
+- User management is API-only for now (curl with an admin session); a
+  dashboard UI panel is a follow-up.
+
+Tests: `tests/unit/users.test.js` (16 tests, fake adapter). E2E-verified:
+legacy login → create admin → mode flip (password-only rejected) → user
+login → viewer read-only (GET 200 / POST 403 / users-API 403) → last-admin
+protection → kill switch → env bootstrap.
+
 ### Per-API-key model restrictions (2026-09-10)
 
 Restrict which models an API key may call, enforced on the whole LLM surface.
