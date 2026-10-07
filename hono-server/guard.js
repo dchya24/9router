@@ -3,8 +3,7 @@
 //
 // Next runs that middleware for every non-static request before rewrites; any
 // path this server answers directly must apply the same deny-by-default rules,
-// otherwise migrated admin APIs lose their auth. Paths handed to NEXT_UPSTREAM
-// are guarded here AND again inside Next — same rules, same verdicts.
+// otherwise migrated admin APIs lose their auth.
 
 import crypto from "node:crypto";
 import { getSettings, validateApiKey } from "@/lib/localDb";
@@ -360,7 +359,7 @@ export function registerGuards(app) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    // Protect dashboard pages (relevant while NEXT_UPSTREAM proxies them).
+    // Protect dashboard pages (static shells are served by this server).
     if (pathname.startsWith("/dashboard")) {
       let requireLogin = true;
       let tunnelDashboardAccess = true;

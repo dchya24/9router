@@ -524,40 +524,9 @@ app.all("/codex/*", (c) => redispatch(c, "/api/v1/responses"));
 // ─── Ops endpoints ──────────────────────────────────────────────────────────
 app.get("/healthz", (c) => c.json({ ok: true, server: "hono" }));
 
-// ─── Front-proxy / static-dashboard modes ───────────────────────────────────
-// NEXT_UPSTREAM (transition): unmigrated dashboard pages are proxied to a Next
-// standalone server on a private port. Otherwise (end-state): the exported
-// dashboard (Next output:"export") is served straight from disk.
-const NEXT_UPSTREAM = process.env.NEXT_UPSTREAM;
-if (NEXT_UPSTREAM) {
-  const upstream = new URL(NEXT_UPSTREAM);
-  app.notFound(async (c) => {
-    const url = new URL(c.req.url);
-    const target = new URL(url.pathname + url.search, upstream);
-    const method = c.req.method;
-    const hasBody = !["GET", "HEAD"].includes(method);
-    try {
-      const res = await fetch(target, {
-        method,
-        headers: c.req.raw.headers,
-        ...(hasBody ? { body: c.req.raw.body, duplex: "half" } : {}),
-        redirect: "manual",
-      });
-      // undici decodes gzip/br but keeps the headers; dropping them stops
-      // clients from trying to decode the already-decoded stream.
-      const headers = new Headers(res.headers);
-      headers.delete("content-encoding");
-      headers.delete("content-length");
-      headers.delete("transfer-encoding");
-      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
-    } catch (e) {
-      return c.json(
-        { error: { message: `Upstream ${NEXT_UPSTREAM} unavailable: ${e?.message || e}`, type: "upstream_error" } },
-        502
-      );
-    }
-  });
-} else {
+// ─── Static dashboard + notFound ─────────────────────────────────────────────
+// The exported dashboard (Next output:"export") is served straight from disk.
+{
   const exportDir = process.env.DASHBOARD_EXPORT_DIR || "out";
   const staticHandler = createStaticHandler(exportDir);
   if (staticHandler) {

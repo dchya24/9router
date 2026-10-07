@@ -233,11 +233,11 @@ verdict-parity against Next direct for: 401/200/403 paths, redirect chains
 JWT cookie. **While both servers run, the guard exists in two copies — any
 change to `dashboardGuard.js` must be mirrored in `hono-server/guard.js`.**
 
-**Front-proxy mode — done.** With `NEXT_UPSTREAM=http://127.0.0.1:<port>`
-set, Hono owns the public port and proxies every unregistered path (unmigrated
-APIs, dashboard pages, static assets) to the Next standalone instance on a
-private port, with undici's stale `content-encoding`/`content-length` headers
-stripped. Next's own middleware re-validates proxied requests.
+**Front-proxy mode — removed.** During the transition, `NEXT_UPSTREAM=http://127.0.0.1:<port>`
+made Hono own the public port and proxy every unregistered path to the Next
+standalone instance. With all API groups migrated and the dashboard served as
+a static export, the front-proxy path and the `start:next-front` script were
+deleted (Next no longer runs at runtime).
 
 **Groups migrated — ALL of them (Phase 3 complete).** `usage` (10),
 `providers` (10), `models` (7), `keys` (2), `combos` (2), `proxy-pools` (6),
@@ -369,7 +369,7 @@ Remaining:
 
 | Path | Purpose |
 | ---- | ------- |
-| `hono-server/server.js` | Entry: route table, rewrites, front-proxy (`NEXT_UPSTREAM`), serve |
+| `hono-server/server.js` | Entry: route table, rewrites, static-export serving, serve |
 | `hono-server/guard.js` | Port of Next middleware + peer-header stamping (auth backbone) |
 | `hono-server/alias-loader.mjs` | Node resolve hook for `@/`, `open-sse`, CJS shim |
 | `hono-server/register.mjs` | Loader registration (`--import` target) |
