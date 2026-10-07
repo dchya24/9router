@@ -52,6 +52,8 @@ source/*
 docs/*
 !docs/ARCHITECTURE.md
 !docs/HONO_MIGRATION_PLAN.md
+!docs/BENCH_VPS_AB.md
+!docs/bench-data/
 test/*
 open-sse/test/*
 RM.vn.md
