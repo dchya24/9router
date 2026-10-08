@@ -110,6 +110,30 @@ Adoption surface:
 - Production gating checklist: pin the Bun minor version; SSE soak with
   real provider traffic remains the one open item.
 
+### Models response cache + SSE provider soak (2026-10-08)
+
+**`/v1/models` response cache (`9818e52d`).** Root cause of the ~8.4 s
+unrestricted request: `buildModelsList` makes LIVE outbound calls per
+request — a `/models` fetch to every OpenAI/Anthropic-compatible provider
+(5 s timeout each) plus one round-trip per LIVE_MODEL_RESOLVERS provider,
+all sequential. `hono-server/models-cache.js` (fork middleware between the
+guard and the route table) caches the unfiltered catalog for
+`NINEROUTER_MODELS_CACHE_TTL_MS` (default 60 s, `0` = off) and clears on
+mutating `/api/providers|combos|models|settings` requests. Restricted-key
+filtering still happens per-request in the guard (cache sits inside it);
+the `x-9r-internal-models-fetch` variant bypasses the cache. Measured on
+the prod-data deployment: MISS ~8.4 s → **HIT ~1 ms**. 8 unit tests
+(Hono-shaped harness with a guard-like outer middleware).
+
+**SSE provider soak.** Running on the bench/deployment VPS against real
+provider traffic: 40 rounds × 3 min (~2 h), one streamed
+`sm/gpt-4.1-nano` chat completion per round (max_tokens 32) through the
+Bun deployment, recording HTTP/TTFB/total/chunks/`[DONE]`/RSS to
+`~/bench/soak-sse.csv` (`SOAK_COMPLETE` marker at the end). Purpose:
+confirm Bun's SSE streaming + connection handling shows no drift over
+sustained real traffic — the last open production-gating item for the
+Bun runtime swap.
+
 ### Per-API-key model restrictions (2026-09-10)
 
 Restrict which models an API key may call, enforced on the whole LLM surface.
