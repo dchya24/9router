@@ -193,6 +193,27 @@ sudo ufw allow 8080/tcp    # only the app port + SSH
 | `NINEROUTER_DISABLE_MITM` | `1` (in image) | hard-off Antigravity MITM; remove to enable |
 | `NINEROUTER_DISABLE_BG_REFRESH` | unset | set `1` to skip OAuth token refresh scheduler |
 
+## Bun runtime variant
+
+The server runs **unmodified under Bun** (native `bun:sqlite` via the driver
+chain, `@/*` aliases resolved natively — no `register.mjs`). From source:
+
+```bash
+npm install && npm run build        # dashboard export → out/ (unchanged)
+bun hono-server/server.js           # or: npm run start:bun
+```
+
+Docker: `Dockerfile.bun` builds the same image on `oven/bun:1.4-alpine`
+(builder stays on Node so the export cache is shared). Validated on
+Bun 1.4.2 — see `docs/BENCH_VPS_BUN.md` (idle ~59 MB vs ~97 MB on Node);
+h2c-downgrade and SSE endpoints behave identically on both runtimes. Pin
+the Bun minor version in production; keep `better-sqlite3` in deps for
+Node fallback (it is simply unused under Bun).
+
+```bash
+docker build -f Dockerfile.bun -t 9router:bun .
+```
+
 ```bash
 docker run -d \
   -p 20128:20128 \

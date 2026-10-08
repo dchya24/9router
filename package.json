@@ -8,6 +8,7 @@
     "dev:webpack": "next dev --webpack --port 20127",
     "build": "NEXT_EXPORT=1 next build --webpack",
     "start": "node --import ./hono-server/register.mjs hono-server/server.js",
+    "start:bun": "bun hono-server/server.js",
     "cli:pack": "npm --prefix cli run pack:cli",
     "cli:publish": "npm --prefix cli run publish:cli",
     "bench:mem": "node scripts/mem-bench.mjs hono"

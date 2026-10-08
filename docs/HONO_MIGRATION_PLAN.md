@@ -83,6 +83,33 @@ legacy login → create admin → mode flip (password-only rejected) → user
 login → viewer read-only (GET 200 / POST 403 / users-API 403) → last-admin
 protection → kill switch → env bootstrap.
 
+**Users management UI (2026-10-08, `116efd7a`):** `/dashboard/users`
+(fork-owned page + `Fork:`-marked System nav entry) — list/create/edit
+(role, password)/delete with last-admin errors surfaced, and a "My
+password" card for any username session via `PATCH /api/users/me`
+(current + new password; registered before `/api/users/:id` so `:id`
+never captures "me"; guard exempts it from the viewer read-only block).
+
+### Bun runtime adoption (2026-10-08)
+
+The server runs **unmodified under Bun** (`bun hono-server/server.js`):
+`driver.js` prefers native `bun:sqlite`, jsconfig `@/*` aliases resolve
+natively (no `register.mjs`), and the h2c-downgrade shim + SSE endpoints
+were functionally verified identical to Node (2026-10-08, Bun 1.4.2 vs
+Node v22.22.2 on the bench VPS). Memory: idle ~59 MB / load p50 ~75 MB
+vs Node ~97/112 — `docs/BENCH_VPS_BUN.md`.
+
+Adoption surface:
+- `npm run start:bun` → `bun hono-server/server.js` (source path; Node
+  `npm start` unchanged).
+- `Dockerfile.bun` — same builder (Node, shared export cache), runner on
+  `oven/bun:1.4-alpine`, `--ignore-scripts` for the runtime deps install
+  (better-sqlite3's native step is unused under Bun), same env defaults
+  and su-exec entrypoint as the standard image. Not yet built in CI —
+  `docker-publish.yml` still publishes the Node image.
+- Production gating checklist: pin the Bun minor version; SSE soak with
+  real provider traffic remains the one open item.
+
 ### Per-API-key model restrictions (2026-09-10)
 
 Restrict which models an API key may call, enforced on the whole LLM surface.

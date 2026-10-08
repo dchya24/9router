@@ -1,0 +1,77 @@
+# syntax=docker/dockerfile:1.7
+# Bun runtime variant of the standard Dockerfile — same builder, Bun runner.
+# The server runs UNMODIFIED under Bun: src/lib/db/driver.js picks the native
+# bun:sqlite adapter (better-sqlite3's native module is never needed here),
+# and jsconfig "@/*" aliases resolve without hono-server/register.mjs.
+# Pin: keep BUN_IMAGE in sync with the version validated by the bench
+# (docs/BENCH_VPS_BUN.md, 1.4.x line).
+ARG NODE_IMAGE=node:22-alpine
+ARG BUN_IMAGE=oven/bun:1.4-alpine
+
+# ── Builder: full deps (Next + React are devDependencies) → static export ──
+# Kept on Node: `next build` is exercised and cached on Node everywhere else.
+FROM ${NODE_IMAGE} AS builder
+WORKDIR /app
+# CN mirror for apk (used by builder stage)
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
+
+COPY package.json bun.lock ./
+RUN --mount=type=cache,target=/root/.npm \
+  npm install
+
+COPY . ./
+ENV NEXT_TELEMETRY_DISABLED=1
+# Static dashboard export (next.config.mjs output:"export") → out/
+RUN NEXT_EXPORT=1 npx next build --webpack
+
+# ── Runner: Bun with production deps ────────────────────────────────────────
+FROM ${BUN_IMAGE} AS runner
+WORKDIR /app
+
+LABEL org.opencontainers.image.title="9router" \
+      org.opencontainers.image.base.name="oven/bun"
+
+ENV NODE_ENV=production
+ENV PORT=20128
+ENV HOST=0.0.0.0
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV DATA_DIR=/app/data
+ENV DASHBOARD_EXPORT_DIR=/app/out
+# Containers never use the Antigravity MITM (sudo/DNS/hosts edits) — hard-off.
+ENV NINEROUTER_DISABLE_MITM=1
+# Workload gates: tunnel/tailscale watchdogs, headroom reverse proxy,
+# pxpipe loader. Unset any of these to re-enable that surface.
+ENV NINEROUTER_DISABLE_TUNNEL=1
+ENV NINEROUTER_DISABLE_HEADROOM=1
+ENV NINEROUTER_DISABLE_PXPIPE=1
+
+COPY package.json ./
+# Runtime deps for Bun. better-sqlite3 is in package.json but its native
+# binding is unused under Bun (driver.js prefers bun:sqlite); a failed or
+# skipped native build here is harmless. If npm's postinstall noise ever
+# blocks the image build, prune it and rely on the bun:sqlite driver.
+RUN --mount=type=cache,target=/root/.npm \
+  npm install --omit=dev --no-audit --no-fund --ignore-scripts
+
+# Server source (routes, sse core, lib, shared) + hono-server + exported dashboard
+COPY hono-server ./hono-server
+COPY src ./src
+COPY open-sse ./open-sse
+COPY --from=builder /app/out ./out
+COPY public ./public
+# sql.js loads dist/sql-wasm.wasm by path at runtime (last-resort DB driver);
+# node-machine-id is createRequire-loaded — both come from npm install above.
+
+RUN mkdir -p /app/data && chown -R bun:bun /app
+
+# Fix permissions at runtime (handles mounted volumes) — same pattern as the
+# standard Dockerfile, but dropping to the image's default `bun` user.
+RUN apk --no-cache upgrade && apk --no-cache add su-exec && \
+  printf '#!/bin/sh\nchown -R bun:bun /app/data 2>/dev/null\nexec su-exec bun "$@"\n' > /entrypoint.sh && \
+  chmod +x /entrypoint.sh
+
+EXPOSE 20128
+
+ENTRYPOINT ["/entrypoint.sh"]
+# Bun resolves jsconfig paths natively — no register.mjs on this path.
+CMD ["bun", "hono-server/server.js"]
