@@ -7,13 +7,17 @@
   
   **Connect All AI Code Tools (Claude Code, Cursor, Antigravity, Copilot, Codex, Gemini, OpenCode, Cline, OpenClaw...) to 40+ AI Providers & 100+ Models.**
   
-  [![npm](https://img.shields.io/npm/v/9router.svg)](https://www.npmjs.com/package/9router)
-  [![Downloads](https://img.shields.io/npm/dm/9router.svg)](https://www.npmjs.com/package/9router)
-  [![Docker Pulls](https://img.shields.io/docker/pulls/decolua/9router.svg?logo=docker&label=Docker%20pulls)](https://hub.docker.com/r/decolua/9router)
-  [![GHCR](https://img.shields.io/badge/GHCR-decolua%2F9router-blue?logo=github)](https://github.com/decolua/9router/pkgs/container/9router)
-  [![License](https://img.shields.io/npm/l/9router.svg)](https://github.com/decolua/9router/blob/main/LICENSE)
+  [![GHCR](https://img.shields.io/badge/GHCR-dchya24%2F9router-blue?logo=github)](https://github.com/dchya24/9router/pkgs/container/9router)
+  [![License](https://img.shields.io/npm/l/9router.svg)](https://github.com/dchya24/9router/blob/master/LICENSE)
 
-<a href="https://trendshift.io/repositories/22628" target="_blank"><img src="https://trendshift.io/api/badge/repositories/22628" alt="decolua%2F9router | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+**Fork note:** this repository is the **Hono single-process fork** of
+[decolua/9router](https://github.com/decolua/9router) — one small runtime
+process (dashboard + APIs + LLM proxy, no Next.js server) with fork features
+(usage retention, multi-user auth, `/v1/models` cache, workload gates) and a
+validated Bun runtime path. Installation methods below cover **this fork
+only**: the GHCR image `ghcr.io/dchya24/9router`, running from source
+(Node or Bun), and the bundled CLI. The `npm install -g 9router` package is
+the upstream project, not this fork.
 
 [🚀 Quick Start](#-quick-start) • [💡 Features](#-key-features) • [📖 Setup](#-setup-guide) • [🌐 Website](https://9router.com)
 
@@ -73,11 +77,40 @@ Result: Never stop coding, minimal cost + 20-40% token savings via RTK
 
 ## ⚡ Quick Start
 
-**1. Install globally:**
+**1. Run the fork (pick one):**
+
+**Docker (GHCR image):**
 
 ```bash
-npm install -g 9router
-9router
+docker run -d \
+  --name 9router \
+  -p 20128:20128 \
+  -v "$HOME/.9router:/app/data" \
+  -e DATA_DIR=/app/data \
+  ghcr.io/dchya24/9router:latest
+```
+
+> Package is private until flipped public — `docker login ghcr.io` first, or
+> build locally: `docker build -t 9router:hono .` (see [DOCKER.md](DOCKER.md)).
+
+**From source — Node:**
+
+```bash
+git clone https://github.com/dchya24/9router.git
+cd 9router
+npm install
+npm run build                 # static dashboard export → out/
+NINEROUTER_DISABLE_MITM=1 PORT=20128 npm start
+```
+
+**From source — Bun (validated, ~40% less memory):**
+
+```bash
+git clone https://github.com/dchya24/9router.git
+cd 9router
+npm install
+npm run build
+bun hono-server/server.js     # or: npm run start:bun
 ```
 
 🎉 Dashboard opens at `http://localhost:20128`
@@ -99,22 +132,13 @@ Claude Code/Codex/OpenClaw/Cursor/Cline Settings:
 
 **Alternative: run from source (this repository):**
 
-This repository package is private (`9router-app`), so source/Docker execution is the expected local development path.
-
-Development (dashboard hot-reload):
+Development (dashboard hot-reload — APIs are served by the Hono process on
+:20128 via dev rewrites):
 
 ```bash
 cp .env.example .env
 npm install
 PORT=20127 NEXT_PUBLIC_BASE_URL=http://localhost:20127 npm run dev
-```
-
-Production (single small Node process — no Next.js server in memory):
-
-```bash
-npm install
-npm run build                 # builds the static dashboard export
-NINEROUTER_DISABLE_MITM=1 PORT=20128 npm start
 ```
 
 > `npm start` runs the Hono server: dashboard (static), all admin APIs, and
@@ -231,7 +255,7 @@ Default URLs:
 
 </div>
 
-> 🎬 **Made a video about 9Router?** Submit a [Pull Request](https://github.com/decolua/9router/pulls) adding your video to this section — we'll merge it!
+> 🎬 **Made a video about 9Router?** Submit a [Pull Request](https://github.com/dchya24/9router/pulls) adding your video to this section — we'll merge it!
 
 ---
 
@@ -1216,8 +1240,8 @@ Model: cc/claude-opus-4-7
 ### VPS Deployment
 
 ```bash
-# Clone and install
-git clone https://github.com/decolua/9router.git
+# Clone and install (this fork)
+git clone https://github.com/dchya24/9router.git
 cd 9router
 npm install
 npm run build
@@ -1229,12 +1253,8 @@ export DATA_DIR="/var/lib/9router"
 export PORT="20128"
 export HOSTNAME="0.0.0.0"
 export NODE_ENV="production"
-export NEXT_PUBLIC_BASE_URL="http://localhost:20128"
-export NEXT_PUBLIC_CLOUD_URL="https://9router.com"
-export API_KEY_SECRET="endpoint-proxy-api-key-secret"
-export MACHINE_ID_SALT="endpoint-proxy-salt"
 
-# Start
+# Start (Node) — or `bun hono-server/server.js` for the Bun runtime
 npm run start
 
 # Or use PM2
@@ -1246,10 +1266,11 @@ pm2 startup
 
 ### Docker
 
-Published images (multi-platform `linux/amd64` + `linux/arm64`):
+Published image (multi-platform `linux/amd64` + `linux/arm64`, this fork only):
 
-- Docker Hub: [`decolua/9router`](https://hub.docker.com/r/decolua/9router)
-- GHCR: [`ghcr.io/decolua/9router`](https://github.com/decolua/9router/pkgs/container/9router)
+- GHCR: [`ghcr.io/dchya24/9router`](https://github.com/dchya24/9router/pkgs/container/9router)
+  — tags per release (e.g. `0.5.69-hono.3`) + `latest`. Private until flipped
+  public in Package settings; `docker login ghcr.io` to pull meanwhile.
 
 **Quick start (use published image):**
 
@@ -1259,16 +1280,18 @@ docker run -d \
   -p 20128:20128 \
   -v "$HOME/.9router:/app/data" \
   -e DATA_DIR=/app/data \
-  decolua/9router:latest
+  ghcr.io/dchya24/9router:latest
 ```
 
 → Open http://localhost:20128
 
+**Bun runtime variant:** `docker build -f Dockerfile.bun -t 9router:bun .`
+
 **Build from source (dev):**
 
 ```bash
-git clone https://github.com/decolua/9router.git
-cd 9router/app
+git clone https://github.com/dchya24/9router.git
+cd 9router
 docker build -t 9router .
 docker run -d --name 9router -p 20128:20128 \
   -v "$HOME/.9router:/app/data" -e DATA_DIR=/app/data 9router
@@ -1285,7 +1308,7 @@ docker run -d --name 9router -p 20128:20128 \
 docker logs -f 9router
 docker restart 9router
 docker stop 9router && docker rm 9router
-docker pull decolua/9router:latest   # update to latest
+docker pull ghcr.io/dchya24/9router:latest   # update to latest
 ```
 
 **Data persistence:** `$HOME/.9router/db/data.sqlite` on host ↔ `/app/data/db/data.sqlite` in container.
@@ -1487,8 +1510,8 @@ Authorization: Bearer your-api-key
 ## 📧 Support
 
 - **Website**: [9router.com](https://9router.com)
-- **GitHub**: [github.com/decolua/9router](https://github.com/decolua/9router)
-- **Issues**: [github.com/decolua/9router/issues](https://github.com/decolua/9router/issues)
+- **GitHub**: [github.com/dchya24/9router](https://github.com/dchya24/9router)
+- **Issues**: [github.com/dchya24/9router/issues](https://github.com/dchya24/9router/issues)
 
 ---
 
@@ -1496,13 +1519,13 @@ Authorization: Bearer your-api-key
 
 Thanks to all contributors who helped make 9Router better!
 
-[![Contributors](https://contrib.rocks/image?repo=decolua/9router&max=150&columns=15&anon=1&v=20260309)](https://github.com/decolua/9router/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=dchya24/9router&max=150&columns=15&anon=1&v=20260309)](https://github.com/dchya24/9router/graphs/contributors)
 
 ---
 
 ## 📊 Star Chart
 
-[![Star Chart](https://starchart.cc/decolua/9router.svg?variant=adaptive)](https://starchart.cc/decolua/9router)
+[![Star Chart](https://starchart.cc/dchya24/9router.svg?variant=adaptive)](https://starchart.cc/dchya24/9router)
 
 ## 🔀 Forks
 

@@ -5,9 +5,9 @@ one small Node process serves the dashboard (static export), all APIs, the
 LLM proxy surface, and the security guard. There is no Next.js server process
 and the Antigravity MITM is disabled by default (`NINEROUTER_DISABLE_MITM=1`).
 
-- Upstream image (pre-fork architecture): [`decolua/9router`](https://hub.docker.com/r/decolua/9router)
-- This fork (Hono single-process): `ghcr.io/dchya24/9router` — published by
-  CI on `v*` tags, or build locally (below).
+Image (this fork): `ghcr.io/dchya24/9router` — published by CI on `v*` tags
+(e.g. `0.5.69-hono.3` + `latest`), or build locally (below). A Bun runtime
+variant exists: `Dockerfile.bun` (see the *Bun runtime variant* section).
 
 ---
 
@@ -21,11 +21,17 @@ docker run -d \
   -v "$HOME/.9router:/app/data" \
   -e DATA_DIR=/app/data \
   --name 9router \
-  9router:hono-test
+  ghcr.io/dchya24/9router:latest
 ```
 
-> Use `decolua/9router:latest` here instead if you want the upstream image.
-> `9router:hono-test` is the tag the local build in this repo produces.
+> The GHCR package is **private** until flipped public in Package settings —
+> `docker login ghcr.io` first, or build locally and use the local tag:
+
+```bash
+docker build -t 9router:hono . && docker run -d \
+  -p 20128:20128 -v "$HOME/.9router:/app/data" -e DATA_DIR=/app/data \
+  --name 9router 9router:hono
+```
 
 App listens on port `20128`. Open: http://localhost:20128
 
@@ -221,7 +227,7 @@ docker run -d \
   -e DATA_DIR=/app/data \
   -e INITIAL_PASSWORD=change-me \
   --name 9router \
-  9router:hono-test
+  9router:hono
 ```
 
 ## Optional Headroom sidecar
@@ -260,9 +266,9 @@ If Headroom runs on the Docker host instead of as a sidecar, use
 ## Update to latest
 
 ```bash
-docker pull decolua/9router:latest   # upstream image
+docker pull ghcr.io/dchya24/9router:latest
 # or rebuild the local image:
-docker build -t 9router:hono-test .
+docker build -t 9router:hono .
 docker rm -f 9router
 # re-run the quick start command
 ```
@@ -274,12 +280,12 @@ docker rm -f 9router
 ## Build image locally
 
 ```bash
-docker build -t 9router:hono-test .
+docker build -t 9router:hono .
 
 docker run --rm -p 20128:20128 \
   -v "$HOME/.9router:/app/data" \
   -e DATA_DIR=/app/data \
-  9router:hono-test
+  9router:hono
 ```
 
 Image anatomy (multi-stage):
@@ -324,8 +330,8 @@ pushes to **this fork's own GHCR** (no extra secrets — the built-in
 `GITHUB_TOKEN` is used):
 
 ```bash
-git tag v0.5.69-hono.1 && git push origin v0.5.69-hono.1
-# → ghcr.io/dchya24/9router:0.5.69-hono.1 + :latest
+git tag v0.5.69-hono.3 && git push origin v0.5.69-hono.3
+# → ghcr.io/dchya24/9router:0.5.69-hono.3 + :latest
 ```
 
 > The first push creates the GHCR package as **private**. For anonymous
