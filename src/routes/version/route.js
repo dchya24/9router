@@ -3,7 +3,7 @@ import pkg from "../../../package.json" with { type: "json" };
 
 // Fork: the npm "9router" package is upstream — version checks point at the
 // fork package (unpublished for now → latest lookup 404 → no update nag).
-const NPM_PACKAGE_NAME = "9router-hono";
+const NPM_PACKAGE_NAME = "@dchya24/9router-hono";
 const VERSION_CACHE_TTL_MS = 3600000; // cache npm latest lookup for 1h
 
 // Survive hot reload; one cache per process
@@ -13,7 +13,7 @@ const versionCache = (global.__npmVersionCache ??= { value: null, fetchedAt: 0 }
 function fetchLatestVersion() {
   return new Promise((resolve) => {
     const req = https.get(
-      `https://registry.npmjs.org/${NPM_PACKAGE_NAME}/latest`,
+      `https://registry.npmjs.org/${encodeURIComponent(NPM_PACKAGE_NAME)}/latest`,
       { timeout: 4000 },
       (res) => {
         let data = "";

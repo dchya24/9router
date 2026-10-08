@@ -19,9 +19,9 @@ export const GITHUB_CONFIG = {
 // would replace the Hono runtime. Updater targets point at the fork's own
 // package (publish pending; until then latest lookups 404 → no update nag).
 export const UPDATER_CONFIG = {
-  npmPackageName: "9router-hono",
-  installCmd: "npm i -g 9router-hono",
-  installCmdLatest: "npm i -g 9router-hono@latest --prefer-online",
+  npmPackageName: "@dchya24/9router-hono",
+  installCmd: "npm i -g @dchya24/9router-hono",
+  installCmdLatest: "npm i -g @dchya24/9router-hono@latest --prefer-online",
   shutdownCountdownSec: 3,
   exitDelayMs: 500,
   statusPort: 20129,
