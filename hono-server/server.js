@@ -26,6 +26,7 @@ import { runWithRequest } from "./shims/next-headers.mjs";
 import { createStaticHandler } from "./static.js";
 import { createWrappingServer } from "./peer-server.js";
 import { registerUserAuth, initUserAuth } from "./users.js";
+import { registerModelsCache } from "./models-cache.js";
 
 const PORT = Number(process.env.PORT || 20127);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -129,6 +130,13 @@ function register(prefix, routes) {
 // handlers take precedence; with zero users they delegate 1:1 to upstream.
 registerUserAuth(app, { on, api: apiAuth });
 initUserAuth().catch(() => {});
+
+// ─── /v1/models response cache (fork feature) ────────────────────────────────
+// Sits between the guard and the route table: caches the unfiltered catalog
+// (per-key restriction filtering still happens in the guard on the way out)
+// and clears on provider/combo/models/settings mutations. The route makes a
+// live outbound call per provider per request — cache turns ~8 s into ~ms.
+registerModelsCache(app);
 
 const V1_ROUTES = [
   ["OPTIONS", "/chat/completions", () => v1("/chat/completions/route.js")],
