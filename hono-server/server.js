@@ -27,6 +27,13 @@ import { createStaticHandler } from "./static.js";
 import { createWrappingServer } from "./peer-server.js";
 import { registerUserAuth, initUserAuth } from "./users.js";
 import { registerModelsCache } from "./models-cache.js";
+import { registerBunShims } from "./bun-shims.js";
+
+// Bun runtime: remap next/headers + next/server (+ node-machine-id) to the
+// request-context shims. Normally already done by the start:bun --preload;
+// this call is the safety net for plain `bun hono-server/server.js` (covers
+// the lazily-imported route modules; static-import shims need the preload).
+registerBunShims();
 
 const PORT = Number(process.env.PORT || 20127);
 const HOST = process.env.HOST || "0.0.0.0";

@@ -243,10 +243,10 @@ export function registerUserAuth(app, { on, api }) {
     const res = await legacyStatus(c);
     if (!res?.ok) return res;
     try {
-      const data = await res.json();
-      data.multiUser = await usersModeActive(adapter);
-      const session = await getDashboardAuthSession(c.req.raw.headers.get("cookie")?.match(/(?:^|;\s*)auth_token=([^;]+)/)?.[1]);
-      if (data.multiUser && session?.sub) {
+    const data = await res.json();
+    data.multiUser = await usersModeActive(adapter);
+    const session = await getDashboardAuthSession(c.req.raw.headers.get("cookie")?.match(/(?:^|;\s*)auth_token=([^;]+)/)?.[1]);
+    if (data.multiUser && session?.sub) {
         data.displayName = session.sub;
         data.loginMethod = "Password";
       }
