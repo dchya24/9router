@@ -1,6 +1,6 @@
 {
   "name": "@dchya24/9router-hono",
-  "version": "0.5.69-hono.3",
+  "version": "0.5.69-hono.4",
   "description": "9Router Hono CLI - Start and manage the 9Router Hono server (Hono/Bun fork)",
   "bin": {
     "9router-hono": "./cli.js"

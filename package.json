@@ -1,6 +1,6 @@
 {
   "name": "9router-hono",
-  "version": "0.5.69-hono.3",
+  "version": "0.5.69-hono.4",
   "description": "9Router web dashboard",
   "private": true,
   "scripts": {
@@ -35,7 +35,7 @@
   "optionalDependencies": {
     "better-sqlite3": "^12.6.2"
   },
-  "comment_better_sqlite3": "kept in optionalDependencies so npm install doesn't fail on systems without build tools — sql.js is used as fallback at runtime",
+  "comment_better_sqlite3": "kept in optionalDependencies so npm install doesn't fail on systems without build tools \u2014 sql.js is used as fallback at runtime",
   "devDependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
