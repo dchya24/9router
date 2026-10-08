@@ -269,6 +269,27 @@ export function registerUserAuth(app, { on, api }) {
     return { session };
   };
 
+  // Self-service password change — any authenticated dashboard user (incl.
+  // viewers, who are otherwise read-only). Requires the current password.
+  // Registered BEFORE /api/users/:id so ":id" never captures "me".
+  app.patch("/api/users/me", async (c) => {
+    const token = c.req.raw.headers.get("cookie")?.match(/(?:^|;\s*)auth_token=([^;]+)/)?.[1];
+    const session = await getDashboardAuthSession(token);
+    if (!session?.sub) return c.json({ error: "Username session required." }, 400);
+    const body = await readJsonBody(c.req.raw);
+    if (typeof body.newPassword !== "string" || validatePassword(body.newPassword)) {
+      return c.json({ error: validatePassword(body.newPassword) || "New password required." }, 400);
+    }
+    const adapter = await loadAdapter();
+    const user = findUserByUsername(adapter, session.sub);
+    if (!user) return c.json({ error: "User not found." }, 404);
+    const ok = await bcrypt.compare(String(body.currentPassword ?? ""), user.passwordHash);
+    if (!ok) return c.json({ error: "Current password is incorrect." }, 403);
+    const res = await updateUser(adapter, user.id, { password: body.newPassword });
+    if (res.error) return c.json({ error: res.error }, 400);
+    return c.json({ ok: true });
+  });
+
   app.get("/api/users", async (c) => {
     const guard = await requireAdmin(c);
     if (guard.error) return guard.error;

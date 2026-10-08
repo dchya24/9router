@@ -260,14 +260,15 @@ async function hasValidToken(request) {
 }
 
 // Fork: multi-user roles. Viewer sessions (JWT role claim = "viewer") get
-// read-only access to the admin API — mutating /api/* methods are rejected.
-// Logout stays open so a viewer can end their own session. Legacy
+// read-only access to the admin API — mutating /api/* methods are rejected,
+// except their own session endpoints (logout, self password change). Legacy
 // shared-password tokens carry no role and remain fully privileged.
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const VIEWER_MUTABLE = new Set(["/api/auth/logout", "/api/auth/login", "/api/users/me"]);
 function viewerBlocked(method, pathname) {
   if (!MUTATING_METHODS.has(method)) return false;
   if (!pathname.startsWith("/api/")) return false;
-  return pathname !== "/api/auth/logout" && pathname !== "/api/auth/login";
+  return !VIEWER_MUTABLE.has(pathname);
 }
 
 // Read settings directly from DB to avoid self-fetch deadlock in middleware

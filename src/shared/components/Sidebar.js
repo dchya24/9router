@@ -37,6 +37,8 @@ const debugItems = [
 const systemItems = [
   { href: "/dashboard/proxy-pools", label: "Proxy Pools", icon: "lan" },
   { href: "/dashboard/skills", label: "Skills", icon: "extension" },
+  // Fork: multi-user auth panel (hono-server/users.js)
+  { href: "/dashboard/users", label: "Users", icon: "manage_accounts" },
 ];
 
 export default function Sidebar({ onClose }) {
