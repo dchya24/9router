@@ -1,7 +1,9 @@
 import https from "https";
 import pkg from "../../../package.json" with { type: "json" };
 
-const NPM_PACKAGE_NAME = "9router";
+// Fork: the npm "9router" package is upstream — version checks point at the
+// fork package (unpublished for now → latest lookup 404 → no update nag).
+const NPM_PACKAGE_NAME = "9router-hono";
 const VERSION_CACHE_TTL_MS = 3600000; // cache npm latest lookup for 1h
 
 // Survive hot reload; one cache per process

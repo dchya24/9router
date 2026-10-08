@@ -1,23 +1,27 @@
 import pkg from "../../../package.json" with { type: "json" };
 
 // App configuration
+// Fork: product identity — "9Router Hono" (Hono/Bun runtime fork of decolua/9router).
 export const APP_CONFIG = {
-  name: "9Router Proxy",
+  name: "9Router Hono",
   description: "AI Infrastructure Management",
   version: pkg.version,
 };
 
 // GitHub configuration
 export const GITHUB_CONFIG = {
-  changelogUrl: "https://raw.githubusercontent.com/decolua/9router/refs/heads/master/CHANGELOG.md",
-  donateUrl: "https://9router.com/api/donate",
+  changelogUrl: "https://raw.githubusercontent.com/dchya24/9router/master/CHANGELOG.md",
+  donateUrl: "https://github.com/dchya24/9router",
 };
 
 // Updater configuration
+// Fork: the npm package "9router" is UPSTREAM — installing it over this fork
+// would replace the Hono runtime. Updater targets point at the fork's own
+// package (publish pending; until then latest lookups 404 → no update nag).
 export const UPDATER_CONFIG = {
-  npmPackageName: "9router",
-  installCmd: "npm i -g 9router",
-  installCmdLatest: "npm i -g 9router@latest --prefer-online",
+  npmPackageName: "9router-hono",
+  installCmd: "npm i -g 9router-hono",
+  installCmdLatest: "npm i -g 9router-hono@latest --prefer-online",
   shutdownCountdownSec: 3,
   exitDelayMs: 500,
   statusPort: 20129,

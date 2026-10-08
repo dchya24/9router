@@ -1,9 +1,9 @@
 {
-  "name": "9router",
-  "version": "0.5.69",
-  "description": "9Router CLI - Start and manage 9Router server",
+  "name": "9router-hono",
+  "version": "0.5.69-hono.3",
+  "description": "9Router Hono CLI - Start and manage the 9Router Hono server (Hono/Bun fork)",
   "bin": {
-    "9router": "./cli.js"
+    "9router-hono": "./cli.js"
   },
   "files": [
     "cli.js",
