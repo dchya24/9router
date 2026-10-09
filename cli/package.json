@@ -1,6 +1,6 @@
 {
   "name": "@dchya24/9router-hono",
-  "version": "0.5.69-hono.4",
+  "version": "0.5.69-hono.5",
   "comment_runtime": "The CLI runs on Node but launches the server with Bun (Bun.serve + built-in bun:sqlite); no SQLite driver is installed into ~/.9router/runtime any more.",
   "description": "9Router Hono CLI - Start and manage the 9Router Hono server (Hono/Bun fork)",
   "bin": {
