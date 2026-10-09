@@ -4,6 +4,7 @@ import { formatRetryAfter, checkFallbackError, isModelLockActive, buildModelLock
 import { MAX_RATE_LIMIT_COOLDOWN_MS } from "open-sse/config/errorConfig.js";
 import { resolveProviderId, FREE_PROVIDERS } from "@/shared/constants/providers.js";
 import { getAntigravityQuotaCache } from "./antigravityQuota.js";
+import { selectQuotaSpreadConnection } from "./quotaSpread.js";
 import * as log from "../utils/logger.js";
 
 // Mutex to prevent race conditions during account selection
@@ -186,6 +187,21 @@ export async function getProviderCredentials(provider, excludeConnectionIds = nu
           lastUsedAt: new Date().toISOString(),
           consecutiveUseCount: 1
         });
+      }
+    } else if (strategy === "quota-spread") {
+      // Fork: ban-resistant rotation — pick the account with the most remaining
+      // quota for this model (proactive poller keeps the cache warm). Reserve
+      // margin + jitter are applied inside the selector; empty cache degrades
+      // to fill-first. Reactive fallback below stays as the safety net.
+      connection = selectQuotaSpreadConnection(availableConnections, model, quotaCache, {
+        marginPct: providerOverride.quotaSpreadMarginPct ?? settings.quotaSpreadMarginPct,
+      });
+      if (connection) {
+        await updateProviderConnection(connection.id, {
+          lastUsedAt: new Date().toISOString()
+        });
+      } else {
+        connection = availableConnections[0];
       }
     } else {
       // Default: fill-first (already sorted by priority in getProviderConnections)

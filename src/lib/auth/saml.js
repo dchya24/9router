@@ -1,4 +1,3 @@
-import { SAML } from "@node-saml/node-saml";
 import { getSettings } from "../db/repos/settingsRepo.js";
 
 /**
@@ -87,7 +86,22 @@ export function getSamlBaseUrl(request, settings) {
   return "http://localhost:20128";
 }
 
-export function createSamlInstance(settings, origin) {
+let samlConstructorPromise;
+
+async function loadSamlConstructor() {
+  if (!samlConstructorPromise) {
+    samlConstructorPromise = import("@node-saml/node-saml")
+      .then((module) => module.SAML || module.default?.SAML || module.default)
+      .catch((error) => {
+        samlConstructorPromise = null;
+        throw error;
+      });
+  }
+  return samlConstructorPromise;
+}
+
+export async function createSamlInstance(settings, origin) {
+  const SAML = await loadSamlConstructor();
   const cert = formatX509Certificate(settings?.samlCert || "") || DUMMY_FALLBACK_CERT;
   const callbackUrl = `${origin}/api/auth/saml/acs`;
   return new SAML({
@@ -111,7 +125,7 @@ export function createSamlInstance(settings, origin) {
  */
 export async function buildSamlAuthorizeUrl(request, settings) {
   const origin = getSamlBaseUrl(request, settings);
-  const samlInstance = createSamlInstance(settings, origin);
+  const samlInstance = await createSamlInstance(settings, origin);
 
   const xml = await samlInstance.generateAuthorizeRequestAsync(false, false);
   const match = xml.match(/ID="([^"]+)"/);
@@ -136,7 +150,7 @@ export async function validateSamlResponse(request, body, expectedRequestId, set
   }
 
   const origin = getSamlBaseUrl(request, settings);
-  const samlInstance = createSamlInstance(settings, origin);
+  const samlInstance = await createSamlInstance(settings, origin);
 
   const container = typeof body === "object" && body !== null ? body : { SAMLResponse: body };
   const rawSamlResponse = container.SAMLResponse;
@@ -168,8 +182,8 @@ export async function validateSamlResponse(request, body, expectedRequestId, set
  * @param {object} settings
  * @returns {string}
  */
-export function generateSamlMetadata(origin, settings) {
-  const samlInstance = createSamlInstance(settings, origin);
+export async function generateSamlMetadata(origin, settings) {
+  const samlInstance = await createSamlInstance(settings, origin);
   return samlInstance.generateServiceProviderMetadata();
 }
 

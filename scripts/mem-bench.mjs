@@ -62,8 +62,9 @@ function startServer(mode) {
   let command, args, cwd, healthPath;
 
   if (mode === "hono") {
-    command = process.execPath;
-    args = ["--import", "./hono-server/register.mjs", "hono-server/server.js"];
+    // This fork's server is Bun-only; the bench harness itself keeps running on Node.
+    command = process.env.NINEROUTER_BUN || "bun";
+    args = ["--preload", "./hono-server/bun-shims.js", "hono-server/server.js"];
     cwd = PROJECT_ROOT;
     healthPath = "/healthz";
   } else if (mode === "next") {

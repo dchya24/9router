@@ -72,14 +72,13 @@ const normalize = (value) => {
 };
 
 /**
- * Extract tokens via better-sqlite3 (bundled dependency).
- * This is the preferred strategy — no external CLI required.
+ * Extract tokens via Bun's built-in SQLite reader.
+ * This is the preferred strategy — no external CLI and no native dependency.
  */
-function extractTokensViaBetterSqlite(dbPath) {
-  // Dynamic require so the route stays importable even if native bindings fail
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require("better-sqlite3");
-  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+async function extractTokensViaBunSqlite(dbPath) {
+  // bun:sqlite reads any SQLite file, including Cursor's state.vscdb.
+  const { Database } = await import("bun:sqlite");
+  const db = new Database(dbPath, { readonly: true });
 
   const query = (key) => {
     const row = db.prepare("SELECT value FROM itemTable WHERE key=? LIMIT 1").get(key);
@@ -96,25 +95,28 @@ function extractTokensViaBetterSqlite(dbPath) {
     }
   };
 
-  let accessToken = null;
-  for (const key of ACCESS_TOKEN_KEYS) {
-    const raw = query(key);
-    if (raw) { accessToken = normalize(raw); break; }
-  }
+  try {
+    let accessToken = null;
+    for (const key of ACCESS_TOKEN_KEYS) {
+      const raw = query(key);
+      if (raw) { accessToken = normalize(raw); break; }
+    }
 
-  let machineId = null;
-  for (const key of MACHINE_ID_KEYS) {
-    const raw = query(key);
-    if (raw) { machineId = normalize(raw); break; }
-  }
+    let machineId = null;
+    for (const key of MACHINE_ID_KEYS) {
+      const raw = query(key);
+      if (raw) { machineId = normalize(raw); break; }
+    }
 
-  db.close();
-  return { accessToken, machineId };
+    return { accessToken, machineId };
+  } finally {
+    db.close();
+  }
 }
 
 /**
  * Extract tokens via sqlite3 CLI.
- * Fallback when better-sqlite3 native bindings are unavailable.
+ * Fallback when bun:sqlite cannot open the database.
  */
 async function extractTokensViaCLI(dbPath) {
   const normalize = (raw) => {
@@ -171,7 +173,7 @@ async function extractTokensViaCLI(dbPath) {
 /**
  * GET /api/oauth/cursor/auto-import
  * Auto-detect and extract Cursor tokens from local SQLite database.
- * Strategy: better-sqlite3 → sqlite3 CLI → manual fallback
+ * Strategy: bun:sqlite → sqlite3 CLI → manual fallback
  */
 export async function GET() {
   try {
@@ -217,9 +219,9 @@ export async function GET() {
       }
     }
 
-    // Strategy 1: better-sqlite3 (bundled — no external tools required)
+    // Strategy 1: bun:sqlite (built into the runtime — no external tools required)
     try {
-      const tokens = extractTokensViaBetterSqlite(dbPath);
+      const tokens = await extractTokensViaBunSqlite(dbPath);
       if (tokens.accessToken && tokens.machineId) {
         return Response.json({
           found: true,

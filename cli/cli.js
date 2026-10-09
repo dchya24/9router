@@ -63,7 +63,6 @@ function createSpinner(text) {
 }
 
 const pkg = require("./package.json");
-const { ensureSqliteRuntime, buildEnvWithRuntime } = require("./hooks/sqliteRuntime");
 const { ensureTrayRuntime } = require("./hooks/trayRuntime");
 const args = process.argv.slice(2);
 
@@ -79,11 +78,6 @@ if (args[0] === "xai" && args[1] === "video") {
     });
   return;
 }
-
-// Self-heal SQLite runtime deps (sql.js + better-sqlite3) into ~/.9router/runtime
-// so the server can resolve them via NODE_PATH. Best-effort — sql.js is required,
-// better-sqlite3 is optional. Logs to stderr only on failure.
-try { ensureSqliteRuntime({ silent: true }); } catch {}
 
 // Self-heal tray runtime (systray for macOS/Linux only). Windows skipped.
 try { ensureTrayRuntime({ silent: true }); } catch {}
@@ -171,8 +165,26 @@ if (skipUpdate && !trayMode && !process.stdin.isTTY) {
   process.env.TRAY_MODE = "1";
 }
 
-// Always use Node.js runtime with absolute path
-const RUNTIME = process.execPath;
+// The CLI runs on Node, but the server it launches is Bun-only (Bun.serve +
+// built-in bun:sqlite). Resolve a Bun binary and fail loudly when it is absent
+// instead of spawning something that cannot start.
+function resolveBunBinary() {
+  const candidates = [
+    process.env.NINEROUTER_BUN,
+    path.basename(process.execPath).startsWith("bun") ? process.execPath : null,
+    path.join(os.homedir(), ".bun", "bin", "bun"),
+    "/usr/local/bin/bun",
+    "/opt/homebrew/bin/bun",
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch { /* keep looking */ }
+  }
+  return "bun"; // fall back to PATH resolution
+}
+
+const RUNTIME = resolveBunBinary();
 
 // Compare semver versions: returns 1 if a > b, -1 if a < b, 0 if equal
 function compareVersions(a, b) {
@@ -525,14 +537,22 @@ function openBrowser(url) {
 }
 
 // Find the Hono server entry (bundled in bin/app for published package).
-// Peer-header stamping and h2c downgrade live in hono-server/peer-server.js.
+// Peer-header stamping is Bun-native (hono-server/peer-headers.js).
 const standaloneDir = path.join(__dirname, "app");
-const registerPath = path.join(standaloneDir, "hono-server", "register.mjs");
 const serverPath = path.join(standaloneDir, "hono-server", "server.js");
+const shimPath = path.join(standaloneDir, "hono-server", "bun-shims.js");
 
-if (!fs.existsSync(serverPath) || !fs.existsSync(registerPath)) {
+if (!fs.existsSync(serverPath)) {
   console.error("Error: hono-server bundle not found.");
   console.error("Please run 'npm run cli:pack' first.");
+  process.exit(1);
+}
+
+const bunAvailable = require("child_process").spawnSync(RUNTIME, ["--version"], { stdio: "ignore" });
+if (bunAvailable.error) {
+  console.error("Error: the 9Router server requires Bun, and no 'bun' binary was found.");
+  console.error("Install it with: curl -fsSL https://bun.sh/install | bash");
+  console.error("Or point NINEROUTER_BUN at an existing binary.");
   process.exit(1);
 }
 
@@ -610,13 +630,12 @@ function startServer(updatePromise) {
   function spawnServer() {
     serverStartTime = Date.now();
     crashLog = [];
-    const child = spawn(RUNTIME, ["--dns-result-order=ipv4first", "--max-old-space-size=6144", "--import", registerPath, serverPath], {
+    const child = spawn(RUNTIME, ["--preload", shimPath, serverPath], {
       cwd: standaloneDir,
       stdio: showLog ? "inherit" : ["ignore", "ignore", "pipe"],
       detached: true,
       windowsHide: true,
       env: {
-        ...buildEnvWithRuntime(process.env),
         PORT: port.toString(),
         HOSTNAME: host
       }

@@ -96,6 +96,17 @@ export async function PATCH(request) {
     }
 
     if (
+      process.env.NINEROUTER_DISABLE_AG_QUOTA_POLLER !== "1" &&
+      (Object.prototype.hasOwnProperty.call(body, "providerStrategies") ||
+        Object.prototype.hasOwnProperty.call(body, "fallbackStrategy") ||
+        Object.prototype.hasOwnProperty.call(body, "antigravityQuotaPollIntervalMs"))
+    ) {
+      import("@/sse/services/antigravityQuotaPoller.js")
+        .then(({ configureAntigravityQuotaPoller }) => configureAntigravityQuotaPoller(settings))
+        .catch((error) => console.warn("[AGQuota] settings update failed:", error.message));
+    }
+
+    if (
       Object.prototype.hasOwnProperty.call(body, "claudeAutoPing") ||
       Object.prototype.hasOwnProperty.call(body, "codexAutoPing")
     ) {

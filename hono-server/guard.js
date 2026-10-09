@@ -1,11 +1,10 @@
 // Port of the Next.js 16 middleware (src/proxy.js → src/dashboardGuard.js)
-// plus the custom-server.js peer-header stamping it depends on.
+// plus the peer-header stamping it depends on.
 //
 // Next runs that middleware for every non-static request before rewrites; any
 // path this server answers directly must apply the same deny-by-default rules,
 // otherwise migrated admin APIs lose their auth.
 
-import crypto from "node:crypto";
 import { getSettings, validateApiKey } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { verifyDashboardAuthToken, getDashboardAuthSession } from "@/lib/auth/dashboardSession";
@@ -15,14 +14,7 @@ import {
   findApiKeyIdByRawKey,
   modelAllowed,
 } from "@/lib/db/repos/keyModelRestrictionsRepo.js";
-
-// Mirrors custom-server.js: per-process secret proving x-9r-real-ip was
-// stamped from the TCP socket rather than supplied by the client.
-export function ensurePeerToken() {
-  if (!process.env.NINEROUTER_PEER_TOKEN) {
-    process.env.NINEROUTER_PEER_TOKEN = crypto.randomBytes(24).toString("hex");
-  }
-}
+import { ensurePeerToken, stampPeerHeaders } from "./peer-headers.js";
 
 const CLI_TOKEN_HEADER = "x-9r-cli-token";
 const CLI_TOKEN_SALT = "9r-cli-auth";
@@ -292,26 +284,9 @@ function isPublicApi(pathname) {
   return PUBLIC_API_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-// Stamps the same peer headers custom-server.js writes for Next, so guard
-// logic (and route handlers) see identical request state on this server.
-async function stampPeerHeaders(c) {
-  const raw = c.req.raw;
-  const socket = c.env?.incoming?.socket;
-  const socketIp = socket?.remoteAddress || "";
-  const xff = raw.headers.get("x-forwarded-for");
-  const xRealIp = raw.headers.get("x-real-ip");
-  const viaProxy = !!(xff || xRealIp);
-  const proxyIp = xRealIp || (xff ? String(xff).split(",")[0].trim() : "");
-  const loopback = isLoopbackHostname(socketIp) || socketIp === "::ffff:127.0.0.1";
-  const ip = loopback && proxyIp ? proxyIp : socketIp;
-  raw.headers.delete("x-9r-real-ip");
-  raw.headers.delete("x-forwarded-for");
-  raw.headers.delete("x-9r-via-proxy");
-  raw.headers.delete("x-9r-peer-token");
-  raw.headers.set("x-9r-real-ip", ip);
-  raw.headers.set("x-9r-peer-token", process.env.NINEROUTER_PEER_TOKEN);
-  if (viaProxy) raw.headers.set("x-9r-via-proxy", "1");
-}
+// Peer-header stamping lives in ./peer-headers.js (Bun-native: the peer address
+// comes from c.env.requestIP). Registered first so every route sees stamped
+// headers, exactly like the Next middleware did.
 
 export function registerGuards(app) {
   ensurePeerToken();

@@ -7,16 +7,14 @@
     "dev": "next dev --port 20127",
     "dev:webpack": "next dev --webpack --port 20127",
     "build": "NEXT_EXPORT=1 next build --webpack",
-    "start": "node --import ./hono-server/register.mjs hono-server/server.js",
-    "start:bun": "bun --preload ./hono-server/bun-shims.js hono-server/server.js",
+    "start": "bun hono-server/server.js",
+    "test": "bun --bun x vitest run --config tests/vitest.config.js",
     "cli:pack": "npm --prefix cli run pack:cli",
     "cli:publish": "npm --prefix cli run publish:cli",
     "bench:mem": "node scripts/mem-bench.mjs hono"
   },
   "dependencies": {
-    "@hono/node-server": "^1.14.10",
     "@node-saml/node-saml": "^5.1.0",
-    "@xyflow/react": "^12.10.1",
     "bcryptjs": "^3.0.3",
     "chalk": "^5.6.2",
     "confbox": "^0.2.4",
@@ -26,16 +24,10 @@
     "node-machine-id": "^1.1.12",
     "open": "^11.0.0",
     "ora": "^9.1.0",
-    "selfsigned": "^5.5.0",
-    "socks-proxy-agent": "^8.0.5",
-    "sql.js": "^1.14.1",
     "undici": "^7.19.2",
     "uuid": "^13.0.0"
   },
-  "optionalDependencies": {
-    "better-sqlite3": "^12.6.2"
-  },
-  "comment_better_sqlite3": "kept in optionalDependencies so npm install doesn't fail on systems without build tools \u2014 sql.js is used as fallback at runtime",
+  "comment_runtime": "Bun only (Bun.serve + built-in bun:sqlite); no SQLite driver or Node server adapter is declared. See Dockerfile.",
   "devDependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
@@ -44,6 +36,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@next/third-parties": "^16.2.9",
     "@tailwindcss/postcss": "^4.1.18",
+    "@xyflow/react": "^12.10.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "marked": "^18.0.1",

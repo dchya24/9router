@@ -28,8 +28,12 @@ describe("CLI bundle layout", () => {
       "hono-server/server.js is the bundle entry point",
     );
     assert.ok(
-      fs.existsSync(path.join(appDir, "hono-server", "register.mjs")),
-      "hono-server/register.mjs is the --import loader target",
+      fs.existsSync(path.join(appDir, "hono-server", "bun-shims.js")),
+      "hono-server/bun-shims.js is the runtime preload target",
+    );
+    assert.ok(
+      fs.existsSync(path.join(appDir, "jsconfig.json")),
+      "jsconfig.json carries the @/* aliases Bun resolves at runtime",
     );
   });
 });

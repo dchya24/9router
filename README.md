@@ -14,9 +14,10 @@
 [decolua/9router](https://github.com/decolua/9router) — one small runtime
 process (dashboard + APIs + LLM proxy, no Next.js server) with fork features
 (usage retention, multi-user auth, `/v1/models` cache, workload gates) and a
-validated Bun runtime path. Installation methods below cover **this fork
-only**: the GHCR image `ghcr.io/dchya24/9router`, running from source
-(Node or Bun), and the bundled CLI. The `npm install -g 9router` package is
+validated Bun runtime by default (Node remains available as a fallback).
+Installation methods below cover **this fork only**: the GHCR image
+`ghcr.io/dchya24/9router`, running from source (Bun or Node), and the bundled
+CLI. The `npm install -g 9router` package is
 the upstream project, not this fork.
 
 [🚀 Quick Start](#-quick-start) • [💡 Features](#-key-features) • [📖 Setup](#-setup-guide) • [🌐 Website](https://9router.com)
@@ -90,27 +91,18 @@ docker run -d \
   ghcr.io/dchya24/9router:latest
 ```
 
-> Package is private until flipped public — `docker login ghcr.io` first, or
-> build locally: `docker build -t 9router:hono .` (see [DOCKER.md](DOCKER.md)).
+> Build locally with `docker build -t 9router .` (Bun runtime).
+> The image runs Bun; Node is only the build-time toolchain.
+> See [DOCKER.md](DOCKER.md) for details.
 
-**From source — Node:**
+**From source (Bun required — the server uses `Bun.serve` + built-in `bun:sqlite`):**
 
 ```bash
 git clone https://github.com/dchya24/9router.git
 cd 9router
 npm install
 npm run build                 # static dashboard export → out/
-NINEROUTER_DISABLE_MITM=1 PORT=20128 npm start
-```
-
-**From source — Bun (validated, ~40% less memory):**
-
-```bash
-git clone https://github.com/dchya24/9router.git
-cd 9router
-npm install
-npm run build
-bun hono-server/server.js     # or: npm run start:bun
+NINEROUTER_DISABLE_MITM=1 PORT=20128 npm start   # runs bun hono-server/server.js
 ```
 
 🎉 Dashboard opens at `http://localhost:20128`
@@ -1269,8 +1261,8 @@ pm2 startup
 Published image (multi-platform `linux/amd64` + `linux/arm64`, this fork only):
 
 - GHCR: [`ghcr.io/dchya24/9router`](https://github.com/dchya24/9router/pkgs/container/9router)
-  — tags per release (e.g. `0.5.69-hono.3`) + `latest`. Private until flipped
-  public in Package settings; `docker login ghcr.io` to pull meanwhile.
+  — release tags + `latest`, built with the Bun runtime by default. (If the
+  package is private, authenticate with `docker login ghcr.io` before pulling.)
 
 **Quick start (use published image):**
 
@@ -1285,7 +1277,10 @@ docker run -d \
 
 → Open http://localhost:20128
 
-**Bun runtime variant:** `docker build -f Dockerfile.bun -t 9router:bun .`
+**Bun runtime (default):** `docker build -t 9router:bun .`
+**Node is build-time only** — the server runs on Bun.
+
+From source, `npm start` runs the server on Bun.
 
 **Build from source (dev):**
 
@@ -1474,7 +1469,7 @@ Notes:
 - **Runtime**: Node.js 20+
 - **Framework**: Next.js 16
 - **UI**: React 19 + Tailwind CSS 4
-- **Database**: SQLite (better-sqlite3 / node:sqlite / sql.js fallback)
+- **Database**: SQLite via Bun's built-in `bun:sqlite`
 - **Streaming**: Server-Sent Events (SSE)
 - **Auth**: OAuth 2.0 (PKCE) + JWT + API Keys
 

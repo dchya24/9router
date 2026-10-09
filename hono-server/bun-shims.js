@@ -1,15 +1,14 @@
-// Bun runtime shims (fork feature) — the Bun counterpart of
-// alias-loader.mjs (Node). Under Bun, register.mjs/alias-loader never load,
-// so bare-specifier Next request-context modules resolve to the REAL Next
-// packages (installed as devDependencies for the dashboard build) and blow up
-// at runtime with "`cookies` was called outside a request scope".
+// Bun runtime shims (fork feature). Without them, bare-specifier Next
+// request-context modules resolve to the REAL Next packages (installed as
+// devDependencies for the dashboard build) and blow up at runtime with
+// "`cookies` was called outside a request scope".
 //
 // Runtime plugins remap exact specifiers via build.module() (onResolve is
-// bundler-only). Registered from start:bun as a --preload so the mapping is
-// in place before guard.js's static import chain; hono-server/server.js also
-// calls registerBunShims() as a safety net for the lazily-imported routes.
+// bundler-only). Loaded via the bunfig.toml preload so the mapping is in place
+// before guard.js's static import chain; hono-server/server.js also calls
+// registerBunShims() as a safety net for the lazily-imported routes.
 //
-// Mirrors alias-loader.mjs:
+// Mappings:
 //   next/headers     -> shims/next-headers.mjs
 //   next/server      -> shims/next-server.mjs
 //   node-machine-id  -> shims/node-machine-id.mjs

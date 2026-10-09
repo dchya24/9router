@@ -13,6 +13,10 @@ const DEFAULT_SETTINGS = {
   tailscaleUrl: "",
   stickyRoundRobinLimit: 3,
   providerStrategies: {},
+  // Antigravity ban-resistant rotation (fork feature): proactive quota poll
+  // interval + reserve margin used by the "quota-spread" fallback strategy.
+  antigravityQuotaPollIntervalMs: 180000,
+  quotaSpreadMarginPct: 15,
   quotaVisibility: {},
   comboStrategy: "fallback",
   comboStickyRoundRobinLimit: 1,

@@ -150,7 +150,7 @@ function initWindowsTray(options) {
 function resolveSystray() {
   let runtimeDir = null;
   try {
-    const { getRuntimeNodeModules } = require("../../../hooks/sqliteRuntime");
+    const { getRuntimeNodeModules } = require("../../../hooks/runtimeDir");
     runtimeDir = getRuntimeNodeModules();
   } catch (e) {}
 
@@ -173,7 +173,7 @@ function chmodTrayBin(pkgName) {
   // binary (observed on macOS). spawn() then fails with EACCES. Best-effort
   // chmod on every init avoids a hard-to-diagnose silent tray failure.
   try {
-    const { getRuntimeNodeModules } = require("../../../hooks/sqliteRuntime");
+    const { getRuntimeNodeModules } = require("../../../hooks/runtimeDir");
     const binName = process.platform === "darwin" ? "tray_darwin_release" : "tray_linux_release";
     const candidates = [
       path.join(getRuntimeNodeModules(), pkgName, "traybin", binName),

@@ -1,0 +1,8 @@
+# Bun runtime configuration.
+#
+# The server is Bun-only, so the request-context shims must be registered before
+# any static import runs (guard.js → machineId.js → "node-machine-id"). A
+# preload does that; running the entry file alone cannot, because the mapping
+# has to be in place before the import graph is evaluated.
+[run]
+preload = ["./hono-server/bun-shims.js"]

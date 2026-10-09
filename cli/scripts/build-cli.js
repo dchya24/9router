@@ -169,13 +169,19 @@ function buildCliPackage() {
     }
     copyRecursive(srcDir, path.join(cliAppDir, dir));
   }
-  // Server code paths the app resolves at runtime (peer deps of src/):
-  // keep node_modules with production deps only.
+  // Bun resolves the "@/*" aliases from jsconfig.json at runtime.
+  const jsconfigSrc = path.join(appDir, "jsconfig.json");
+  if (!fs.existsSync(jsconfigSrc)) {
+    console.error("❌ jsconfig.json missing — Bun cannot resolve the @/* aliases");
+    process.exit(1);
+  }
+  fs.copyFileSync(jsconfigSrc, path.join(cliAppDir, "jsconfig.json"));
   console.log("✅ Copied hono-server runtime\n");
 
-  // Step 3b: Configure SQLite drivers (unchanged policy: better-sqlite3 lives
-  // in ~/.9router/runtime, sql.js is bundled, node:sqlite/bun:sqlite built-in).
-  console.log("3️⃣ b Configuring SQLite drivers...");
+  // Step 3b: The server is Bun-only, so its database driver (bun:sqlite) needs
+  // no bundled native module. Only `open` is kept because it must stay external
+  // (see next.config.mjs: webpack would inline the build machine's path).
+  console.log("3️⃣ b Bundling external-only modules...");
   function ensureModuleInBundle(pkg) {
     const dest = path.join(cliAppDir, "node_modules", pkg);
     if (fs.existsSync(dest)) {
@@ -188,18 +194,20 @@ function buildCliPackage() {
     ];
     const srcM = candidates.find((p) => fs.existsSync(p));
     if (!srcM) {
-      console.warn(`⚠️  ${pkg} not found locally — bundle will rely on node:sqlite or runtime install`);
+      console.warn(`⚠️  ${pkg} not found locally — the bundle will install it on first boot`);
       return;
     }
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     copyRecursive(srcM, dest);
     console.log(`✅ Bundled ${pkg}`);
   }
-  ensureModuleInBundle("sql.js");
   ensureModuleInBundle("open");
   console.log("");
 
   // Step 4: Copy the static dashboard export (dist dir IS the site root).
+  // Next's export already contains every public/ asset at the same relative
+  // path, and the static handler only ever serves this export dir, so there is
+  // no separate public/ copy — verified: 186/186 public files present in out/.
   console.log("4️⃣  Copying static dashboard export...");
   const exportSrc = path.join(appDir, "out");
   if (fs.existsSync(path.join(exportSrc, "index.html"))) {
@@ -212,17 +220,6 @@ function buildCliPackage() {
     process.exit(1);
   }
 
-  // Step 5: Copy public folder if exists
-  console.log("5️⃣  Copying public folder...");
-  const publicSrc = path.join(appDir, "public");
-  const publicDest = path.join(cliAppDir, "public");
-  if (fs.existsSync(publicSrc)) {
-    copyRecursive(publicSrc, publicDest);
-    console.log("✅ Copied public folder\n");
-  } else {
-    console.log("⏭️  No public folder found\n");
-  }
-
   // Step 6: production package.json so the bundle can npm-install missing
   // runtime deps on first boot (same self-heal as before).
   fs.writeFileSync(path.join(cliAppDir, "package.json"), JSON.stringify({
@@ -232,27 +229,9 @@ function buildCliPackage() {
   }, null, 2));
   console.log("✅ Wrote bundle package.json\n");
 
-  // Step 7: Copy MITM server files (not bundled by Next.js standalone)
-  console.log("7️⃣  Copying MITM server files...");
-  const mitmSrc = path.join(appDir, "src", "mitm");
-  const mitmDest = path.join(cliAppDir, "src", "mitm");
-  if (fs.existsSync(mitmSrc)) {
-    copyRecursive(mitmSrc, mitmDest);
-    console.log("✅ Copied MITM files\n");
-  } else {
-    console.log("⏭️  No MITM files found\n");
-  }
-
-  // Step 7b: Copy standalone updater (headless Node process for install progress)
-  console.log("7️⃣ b Copying updater files...");
-  const updaterSrc = path.join(appDir, "src", "lib", "updater");
-  const updaterDest = path.join(cliAppDir, "src", "lib", "updater");
-  if (fs.existsSync(updaterSrc)) {
-    copyRecursive(updaterSrc, updaterDest);
-    console.log("✅ Copied updater files\n");
-  } else {
-    console.log("⏭️  No updater files found\n");
-  }
+  // Steps 7 / 7b: no separate copies. `src/mitm` and `src/lib/updater` are
+  // already in the bundle because step 3 copies `src/` recursively, and
+  // buildMitm.js (step 8) writes its bundles into cli/app/src/mitm itself.
 
   // Step 8: Build MITM server (config driven - see app/cli/scripts/buildMitm.js)
   console.log("8️⃣  Building MITM server...");

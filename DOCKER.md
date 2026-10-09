@@ -1,13 +1,14 @@
 # Docker
 
-Run 9Router in a container. This fork builds a **single-process Hono image** —
-one small Node process serves the dashboard (static export), all APIs, the
-LLM proxy surface, and the security guard. There is no Next.js server process
-and the Antigravity MITM is disabled by default (`NINEROUTER_DISABLE_MITM=1`).
+Run 9Router in a container. The default image uses **Bun + Hono in one
+process** to serve the static dashboard, APIs, LLM proxy, and security guard.
+There is no Next.js server process, and the Antigravity MITM is disabled by
+default (`NINEROUTER_DISABLE_MITM=1`). Node is a build-time toolchain only:
+the running server is Bun.
 
 Image (this fork): `ghcr.io/dchya24/9router` — published by CI on `v*` tags
-(e.g. `0.5.69-hono.3` + `latest`), or build locally (below). A Bun runtime
-variant exists: `Dockerfile.bun` (see the *Bun runtime variant* section).
+(e.g. `0.5.69-hono.4` + `latest`), using Bun by default. Build locally with
+`docker build -t 9router .`.
 
 ---
 
@@ -24,13 +25,12 @@ docker run -d \
   ghcr.io/dchya24/9router:latest
 ```
 
-> The GHCR package is **private** until flipped public in Package settings —
-> `docker login ghcr.io` first, or build locally and use the local tag:
+If building locally, the default Dockerfile uses Bun:
 
 ```bash
-docker build -t 9router:hono . && docker run -d \
+docker build -t 9router . && docker run -d \
   -p 20128:20128 -v "$HOME/.9router:/app/data" -e DATA_DIR=/app/data \
-  --name 9router 9router:hono
+  --name 9router 9router
 ```
 
 App listens on port `20128`. Open: http://localhost:20128
@@ -93,10 +93,10 @@ Container path: `/app/data/db/data.sqlite`
 
 # 🌍 VPS deployment
 
-The fork runs as a single small Node process — no Next.js server — so a VPS
-needs only Node 22 (or Docker) and a data directory. Because a VPS is
-internet-exposed, set `REQUIRE_API_KEY=true`, a strong `INITIAL_PASSWORD`, and
-a random `JWT_SECRET` before the first boot.
+The fork runs as a single Bun process by default (Node 22 is the fallback),
+with no Next.js server. Because a VPS is internet-exposed, set
+`REQUIRE_API_KEY=true`, a strong `INITIAL_PASSWORD`, and a random `JWT_SECRET`
+before the first boot.
 
 ## Option A — Docker
 
@@ -137,13 +137,14 @@ services:
 ## Option B — from source (systemd)
 
 ```bash
-# Node.js 22
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs
+# Bun runtime (install Bun using its official installer)
+curl -fsSL https://bun.sh/install | bash
 
 git clone https://github.com/dchya24/9router.git /opt/9router && cd /opt/9router
 npm install
 NEXT_EXPORT=1 npm run build     # static dashboard -> out/
-npm prune --omit=dev            # runtime deps only
+npm prune --omit=dev --omit=optional # runtime deps only; Bun uses bun:sqlite
+bun --preload ./hono-server/bun-shims.js hono-server/server.js
 ```
 
 `/etc/systemd/system/9router.service` — custom port via `PORT`:
@@ -164,7 +165,7 @@ Environment=NINEROUTER_DISABLE_MITM=1
 Environment=INITIAL_PASSWORD=<strong-password>
 Environment=JWT_SECRET=<random>
 Environment=REQUIRE_API_KEY=true
-ExecStart=/usr/bin/node --import ./hono-server/register.mjs hono-server/server.js
+ExecStart=/root/.bun/bin/bun --preload ./hono-server/bun-shims.js hono-server/server.js
 Restart=on-failure
 RestartSec=3
 
@@ -199,26 +200,29 @@ sudo ufw allow 8080/tcp    # only the app port + SSH
 | `NINEROUTER_DISABLE_MITM` | `1` (in image) | hard-off Antigravity MITM; remove to enable |
 | `NINEROUTER_DISABLE_BG_REFRESH` | unset | set `1` to skip OAuth token refresh scheduler |
 
-## Bun runtime variant
+## Bun runtime
 
 The server runs **unmodified under Bun** (native `bun:sqlite` via the driver
-chain, `@/*` aliases resolved natively — no `register.mjs`). From source:
+chain, `@/*` aliases resolved natively). From source:
 
 ```bash
 npm install && npm run build        # dashboard export → out/ (unchanged)
-bun hono-server/server.js           # or: npm run start:bun
+npm start   # bun --preload ./hono-server/bun-shims.js hono-server/server.js
 ```
 
-Docker: `Dockerfile.bun` builds the same image on `oven/bun:1.4-alpine`
-(builder stays on Node so the export cache is shared). Validated on
-Bun 1.4.2 — see `docs/BENCH_VPS_BUN.md` (idle ~59 MB vs ~97 MB on Node);
-h2c-downgrade and SSE endpoints behave identically on both runtimes. Pin
-the Bun minor version in production; keep `better-sqlite3` in deps for
-Node fallback (it is simply unused under Bun).
+The default `Dockerfile` builds the Bun runtime on `oven/bun:1.4-alpine`
+(builder stays on Node so the dashboard export uses the existing toolchain).
+Validated on Bun 1.4.2 — see `docs/BENCH_VPS_BUN.md` (idle ~59 MB vs ~97 MB on
+Node in the comparable benchmark). The Bun runner omits the optional SQLite
+drivers (`better-sqlite3`, `sql.js`); it uses the built-in `bun:sqlite`. Keep
+the Bun minor version pinned and revalidate before upgrades.
 
 ```bash
-docker build -f Dockerfile.bun -t 9router:bun .
+docker build -t 9router:bun .
+docker run -d -p 20128:20128 -v "$HOME/.9router:/app/data" \
+  -e DATA_DIR=/app/data -e INITIAL_PASSWORD=change-me --name 9router 9router:bun
 ```
+
 
 ```bash
 docker run -d \
@@ -227,7 +231,7 @@ docker run -d \
   -e DATA_DIR=/app/data \
   -e INITIAL_PASSWORD=change-me \
   --name 9router \
-  9router:hono
+  9router:bun
 ```
 
 ## Optional Headroom sidecar
@@ -268,7 +272,7 @@ If Headroom runs on the Docker host instead of as a sidecar, use
 ```bash
 docker pull ghcr.io/dchya24/9router:latest
 # or rebuild the local image:
-docker build -t 9router:hono .
+docker build -t 9router .
 docker rm -f 9router
 # re-run the quick start command
 ```
@@ -280,30 +284,34 @@ docker rm -f 9router
 ## Build image locally
 
 ```bash
-docker build -t 9router:hono .
+docker build -t 9router .
 
 docker run --rm -p 20128:20128 \
   -v "$HOME/.9router:/app/data" \
   -e DATA_DIR=/app/data \
-  9router:hono
+  9router
+
 ```
 
 Image anatomy (multi-stage):
 
 - **builder** — installs all deps (Next/React are devDependencies) and runs
   the static dashboard export
-- **runner** — production deps only (`hono`, `jose`, `undici`,
-  `better-sqlite3`, `sql.js`, …) + `hono-server/`, `src/`, `open-sse/`, and
-  the exported dashboard. No Next.js server, no build tools.
+- **Production dependency stage** — installs runtime packages with Node/npm,
+  excluding the optional SQLite drivers (`better-sqlite3`, `sql.js`) for Bun.
+  The runtime image receives only `node_modules`, not npm itself.
+- **Bun runner** — `hono-server/`, `src/`, `open-sse/`, dependencies, and the
+  exported dashboard. It does not copy duplicate `public/` assets or Next.js.
+- **No SQLite driver is installed** — `bun:sqlite` is built into the runtime.
 
-Runtime entry: `node --import ./hono-server/register.mjs hono-server/server.js`
-(the `--import` loader resolves the `@/` and `open-sse` aliases and shims
-`next/headers` for the migrated auth routes).
+Runtime entry is `bun --preload ./hono-server/bun-shims.js hono-server/server.js`
+(`bunfig.toml` sets the same preload, so plain `bun hono-server/server.js` works).
 
 ## What the process does at boot
 
 1. Peer-header stamping + h2c downgrade wrap the HTTP server
-   (`hono-server/peer-server.js`, parity with the old custom-server.js).
+   (Bun-native: `hono-server/peer-headers.js` reads the peer address from
+   `requestIP`).
 2. Deny-by-default auth guard (`hono-server/guard.js`) — public allow-list,
    JWT session cookie, CLI token, API-key gate on `/v1`.
 3. Background OAuth token refresh scheduler (disable with

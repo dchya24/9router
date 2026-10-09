@@ -1,36 +1,32 @@
-#!/usr/bin/env node
-// 9Router proxy surface on Hono + bare Node (Fase 2 spike).
+#!/usr/bin/env bun
+// 9Router proxy surface on Hono + Bun.
 //
 // Design: instead of duplicating route logic, this server imports the original
 // Next route modules from src/app/api/** and calls their exported handlers
 // (POST/GET/OPTIONS). Every migrated route file must stay Web-API-only:
 //   - receives (Request, { params: Promise<object> })   (Next 15 signature)
 //   - returns a standard Response (streaming included)
-// Handlers may keep using next/headers cookies()/headers() later — the hybrid
-// invocation context preserves it; on bare Node those routes are not imported.
 //
-// Not yet ported from custom-server.js (no proxy surface depends on them):
-//   - x-9r-real-ip / peer-token header stamping (needed when auth routes move)
-//   - h2c upgrade downgrade
-//   - 128mb proxyClientMaxBodySize (Hono imposes no body limit)
+// Runtime: Bun only. Bun.serve provides the peer address used for peer-header
+// stamping (hono-server/peer-headers.js), resolves jsconfig "@/*" paths
+// natively, and answers h2c upgrade requests as plain HTTP/1.1 — so the Node
+// createServer wrapper and its h2c downgrade are gone.
 //
 // Env: PORT (default 20127), HOST (default 0.0.0.0), DATA_DIR.
-// NINEROUTER_DISABLE_MITM=1: never auto-start the Antigravity MITM process,
-// skip DNS restores/cleanup, and make the /api/cli-tools/antigravity-mitm*
-// endpoints answer 503. Recommended for container deployments.
+// NINEROUTER_DISABLE_MITM=1: never auto-start the Antigravity MITM process and
+// make the /api/cli-tools/antigravity-mitm* endpoints answer 503. Recommended
+// for container deployments.
 
-import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { registerGuards } from "./guard.js";
 import { runWithRequest } from "./shims/next-headers.mjs";
 import { createStaticHandler } from "./static.js";
-import { createWrappingServer } from "./peer-server.js";
 import { registerUserAuth, initUserAuth } from "./users.js";
 import { registerModelsCache } from "./models-cache.js";
 import { registerBunShims } from "./bun-shims.js";
 
 // Bun runtime: remap next/headers + next/server (+ node-machine-id) to the
-// request-context shims. Normally already done by the start:bun --preload;
+// request-context shims. Normally already done by the bunfig.toml preload;
 // this call is the safety net for plain `bun hono-server/server.js` (covers
 // the lazily-imported route modules; static-import shims need the preload).
 registerBunShims();
@@ -603,6 +599,30 @@ try {
   console.error("[hono] retention failed to start:", e?.message || e);
 }
 
+// ─── Antigravity quota poller (fork feature; ban-resistant rotation) ─────────
+// Do not load its provider graph or allocate a timer unless quota-spread is
+// enabled. Settings changes start/stop it without a process restart.
+if (process.env.NINEROUTER_DISABLE_AG_QUOTA_POLLER !== "1") {
+  try {
+    const settings = await import("../src/lib/localDb.js").then((m) => m.getSettings());
+    const providerOverride = settings.providerStrategies?.antigravity || {};
+    const strategy = providerOverride.fallbackStrategy || settings.fallbackStrategy || "fill-first";
+    const intervalMs = Number(settings.antigravityQuotaPollIntervalMs ?? 180000);
+    if (strategy === "quota-spread" && Number.isFinite(intervalMs) && intervalMs > 0) {
+      const { configureAntigravityQuotaPoller, stopAntigravityQuotaPoller } = await import("../src/sse/services/antigravityQuotaPoller.js");
+      configureAntigravityQuotaPoller(settings);
+      process.once("SIGINT", () => {
+        try { stopAntigravityQuotaPoller(); } catch { /* ignore */ }
+      });
+      process.once("SIGTERM", () => {
+        try { stopAntigravityQuotaPoller(); } catch { /* ignore */ }
+      });
+    }
+  } catch (e) {
+    console.error("[hono] antigravity quota poller failed to configure:", e?.message || e);
+  }
+}
+
 // ─── Instrumentation parity (src/instrumentation.js register()) ─────────────
 // Console-log capture feeds /api/translator/console-logs; the catalog override
 // + sync back open-sse capabilities used by /v1/models.
@@ -619,21 +639,20 @@ if (process.env.NINEROUTER_DISABLE_INSTRUMENTATION !== "1") {
   }
 }
 
-const server = serve({ fetch: app.fetch, port: PORT, hostname: HOST, createServer: createWrappingServer }, (info) => {
-  console.log(`[hono] 9Router proxy surface listening on http://${HOST}:${info.port}`);
-});
+const server = Bun.serve({ fetch: app.fetch, port: PORT, hostname: HOST });
+console.log(`[hono] 9Router proxy surface listening on http://${HOST}:${server.port}`);
 
-// A long-running local proxy must not die on one bad request. Log loudly; the
-// default Node behavior (crash on unhandled rejection) killed the process when
-// a lazy module load failed mid-request.
+// A long-running local proxy must not die on one bad request. Log loudly; a
+// crash on unhandled rejection killed the process when a lazy module load
+// failed mid-request.
 process.on("unhandledRejection", (reason) => {
   console.error("[hono] unhandled rejection:", reason?.stack || reason);
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.once(sig, () => {
-    server.close(() => process.exit(0));
-    // Fallback force-exit if connections linger
+    // Drain in-flight requests, then force-exit if connections linger.
+    Promise.resolve(server.stop(false)).finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 3000).unref();
   });
 }
