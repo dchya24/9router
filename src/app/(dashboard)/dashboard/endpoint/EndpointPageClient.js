@@ -285,7 +285,9 @@ export default function APIPageClient({ machineId }) {
       try {
         const [resRestrictions, resModels] = await Promise.all([
           fetch("/api/key-models"),
-          fetch("/v1/models"),
+          // Fork: dashboard-authenticated catalog (browser sessions can't
+          // authenticate on the guarded /v1/models surface when remote).
+          fetch("/api/models-catalog"),
         ]);
         if (resRestrictions.ok) {
           const data = await resRestrictions.json();

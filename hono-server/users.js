@@ -33,6 +33,7 @@ import { checkLock, recordFail, recordSuccess, getClientIp } from "@/lib/auth/lo
 export const USERNAME_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
 export const MIN_PASSWORD_LENGTH = 8;
 export const USER_ROLES = ["admin", "viewer"];
+export const MAX_ALLOWED_MODELS = 500;
 const BCRYPT_COST = 10;
 // Compared against when the username does not exist, so a wrong username and
 // a wrong password take the same time (no user enumeration via timing).
@@ -59,13 +60,44 @@ export function validateRole(role) {
   return null;
 }
 
+// Fork: per-user allowed-model ceiling (applied to every API key they own).
+// undefined = not provided (no change); [] = explicitly unrestricted.
+export function validateAllowedModels(models) {
+  if (models === undefined) return { provided: false, list: [] };
+  if (!Array.isArray(models)) {
+    return { error: "allowedModels must be an array of model id strings." };
+  }
+  const list = [...new Set(models.map((m) => String(m).trim()).filter(Boolean))];
+  if (list.length > MAX_ALLOWED_MODELS) {
+    return { error: `allowedModels list is too long (max ${MAX_ALLOWED_MODELS}).` };
+  }
+  return { provided: true, list };
+}
+
+export function parseAllowedModels(raw) {
+  if (!raw) return [];
+  try {
+    const value = JSON.parse(raw);
+    return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function hashPassword(password) {
   return bcrypt.hashSync(password, BCRYPT_COST);
 }
 
 export function userSummary(row) {
   if (!row) return null;
-  return { id: row.id, username: row.username, role: row.role, createdAt: row.createdAt, updatedAt: row.updatedAt };
+  return {
+    id: row.id,
+    username: row.username,
+    role: row.role,
+    allowedModels: parseAllowedModels(row.allowedModels),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 // ── Storage (adapter-injected, same surface the drivers expose) ─────────────
@@ -77,10 +109,16 @@ export async function ensureUsersTable(adapter) {
        username TEXT NOT NULL UNIQUE,
        passwordHash TEXT NOT NULL,
        role TEXT NOT NULL DEFAULT 'admin',
+       allowedModels TEXT,
        createdAt TEXT NOT NULL,
        updatedAt TEXT NOT NULL
      )`
   );
+  // Existing installs: CREATE TABLE IF NOT EXISTS skips the newer column.
+  const cols = adapter.all("PRAGMA table_info(dashboardUsers)") || [];
+  if (!cols.some((c) => c?.name === "allowedModels")) {
+    adapter.exec("ALTER TABLE dashboardUsers ADD COLUMN allowedModels TEXT");
+  }
 }
 
 function countBy(adapter, where, params) {
@@ -119,6 +157,8 @@ export async function createUser(adapter, input) {
   if (passwordError) return { error: passwordError };
   const roleError = validateRole(input?.role);
   if (roleError) return { error: roleError };
+  const models = validateAllowedModels(input?.allowedModels);
+  if (models.error) return { error: models.error };
   if (findUserByUsername(adapter, input.username)) return { error: "Username already exists." };
   const now = new Date().toISOString();
   const row = {
@@ -126,12 +166,13 @@ export async function createUser(adapter, input) {
     username: input.username,
     passwordHash: hashPassword(input.password),
     role: input.role,
+    allowedModels: models.provided && models.list.length ? JSON.stringify(models.list) : null,
     createdAt: now,
     updatedAt: now,
   };
   adapter.run(
-    "INSERT INTO dashboardUsers (id, username, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
-    [row.id, row.username, row.passwordHash, row.role, row.createdAt, row.updatedAt]
+    "INSERT INTO dashboardUsers (id, username, passwordHash, role, allowedModels, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [row.id, row.username, row.passwordHash, row.role, row.allowedModels, row.createdAt, row.updatedAt]
   );
   return { user: userSummary(row) };
 }
@@ -152,6 +193,11 @@ export async function updateUser(adapter, id, input) {
       return { error: "Cannot demote the last admin." };
     }
     updates.role = input.role;
+  }
+  if (input?.allowedModels !== undefined) {
+    const models = validateAllowedModels(input.allowedModels);
+    if (models.error) return { error: models.error };
+    updates.allowedModels = models.list.length ? JSON.stringify(models.list) : null;
   }
   const keys = Object.keys(updates);
   if (!keys.length) return { error: "Nothing to update." };
@@ -203,6 +249,10 @@ export function authCookieHeader(token, request) {
   return attrs.join("; ");
 }
 
+function authTokenFrom(request) {
+  return request.headers.get("cookie")?.match(/(?:^|;\s*)auth_token=([^;]+)/)?.[1];
+}
+
 function isTunnelRequest(request, settings) {
   const host = (request.headers.get("host") || "").split(":")[0].toLowerCase();
   const tunnelHost = settings.tunnelUrl ? new URL(settings.tunnelUrl).hostname.toLowerCase() : "";
@@ -221,7 +271,7 @@ async function readJsonBody(request) {
 // ── Route registration (called from hono-server/server.js BEFORE the
 //    upstream route table so these take precedence) ───────────────────────────
 
-export function registerUserAuth(app, { on, api }) {
+export function registerUserAuth(app, { on, api, apiKeys }) {
   if (process.env.NINEROUTER_DISABLE_MULTI_USER === "1") {
     console.log("[users] multi-user auth disabled via NINEROUTER_DISABLE_MULTI_USER=1");
     return;
@@ -245,7 +295,7 @@ export function registerUserAuth(app, { on, api }) {
     try {
     const data = await res.json();
     data.multiUser = await usersModeActive(adapter);
-    const session = await getDashboardAuthSession(c.req.raw.headers.get("cookie")?.match(/(?:^|;\s*)auth_token=([^;]+)/)?.[1]);
+    const session = await getDashboardAuthSession(authTokenFrom(c.req.raw));
     if (data.multiUser && session?.sub) {
         data.displayName = session.sub;
         data.loginMethod = "Password";
@@ -258,7 +308,7 @@ export function registerUserAuth(app, { on, api }) {
 
   // ── Admin-only user management ────────────────────────────────────────────
   const requireAdmin = async (c) => {
-    const token = c.req.raw.headers.get("cookie")?.match(/(?:^|;\s*)auth_token=([^;]+)/)?.[1];
+    const token = authTokenFrom(c.req.raw);
     const session = await getDashboardAuthSession(token);
     // Legacy shared-password sessions carry no role — they are admin by
     // definition (that password IS the admin credential).
@@ -273,7 +323,7 @@ export function registerUserAuth(app, { on, api }) {
   // viewers, who are otherwise read-only). Requires the current password.
   // Registered BEFORE /api/users/:id so ":id" never captures "me".
   app.patch("/api/users/me", async (c) => {
-    const token = c.req.raw.headers.get("cookie")?.match(/(?:^|;\s*)auth_token=([^;]+)/)?.[1];
+    const token = authTokenFrom(c.req.raw);
     const session = await getDashboardAuthSession(token);
     if (!session?.sub) return c.json({ error: "Username session required." }, 400);
     const body = await readJsonBody(c.req.raw);
@@ -321,6 +371,47 @@ export function registerUserAuth(app, { on, api }) {
     if (res.error) return c.json({ error: res.error }, 400);
     return c.json({ ok: true });
   });
+
+  // ── API-key ownership binding (fork) ─────────────────────────────────────
+  // Keys created from a username session are bound to that user and inherit
+  // their allowed-models ceiling (hono-server/userModelPolicy.js). Legacy
+  // shared-password sessions create unbound, unrestricted keys. Registered
+  // BEFORE the upstream keys group so these routes win.
+  if (apiKeys) {
+    const createKeyHandler = on("POST", () => apiKeys("/route.js"));
+    app.post("/api/keys", async (c) => {
+      const res = await createKeyHandler(c);
+      if (res?.status === 201) {
+        const session = await getDashboardAuthSession(authTokenFrom(c.req.raw));
+        if (session?.sub) {
+          const body = await res.clone().json().catch(() => null);
+          if (body?.id) {
+            try {
+              const { setApiKeyOwner } = await import("./userModelPolicy.js");
+              await setApiKeyOwner(body.id, session.sub);
+            } catch (e) {
+              // Unbound key fallback: unrestricted (never breaks key creation).
+              console.error("[users] key owner binding failed:", e?.message || e);
+            }
+          }
+        }
+      }
+      return res;
+    });
+
+    const deleteKeyHandler = on("DELETE", () => apiKeys("/[id]/route.js"), { id: "id" });
+    app.delete("/api/keys/:id", async (c) => {
+      const id = c.req.param("id");
+      const res = await deleteKeyHandler(c);
+      if (res?.ok) {
+        try {
+          const { deleteApiKeyOwner } = await import("./userModelPolicy.js");
+          await deleteApiKeyOwner(id);
+        } catch { /* stale kv rows are harmless */ }
+      }
+      return res;
+    });
+  }
 }
 
 async function loginUserMode(c, adapter) {

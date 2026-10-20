@@ -131,7 +131,7 @@ function register(prefix, routes) {
 // ─── Multi-user auth (fork feature) ──────────────────────────────────────────
 // Must register BEFORE the upstream route table so the fork login/status
 // handlers take precedence; with zero users they delegate 1:1 to upstream.
-registerUserAuth(app, { on, api: apiAuth });
+registerUserAuth(app, { on, api: apiAuth, apiKeys });
 initUserAuth().catch(() => {});
 
 // ─── /v1/models response cache (fork feature) ────────────────────────────────
@@ -140,6 +140,15 @@ initUserAuth().catch(() => {});
 // and clears on provider/combo/models/settings mutations. The route makes a
 // live outbound call per provider per request — cache turns ~8 s into ~ms.
 registerModelsCache(app);
+
+// ─── Dashboard-auth models catalog (fork feature) ────────────────────────────
+// The dashboard UI (API-key restriction picker, user allowed-models editor)
+// needs the same catalog as /v1/models, but browser sessions cannot
+// authenticate against the guarded public LLM surface (Bearer/API-key only) —
+// remote dashboards got 401 there. This route reuses the upstream /v1/models
+// handler verbatim, is protected by the default /api/* dashboard-JWT guard,
+// and shares the /v1/models cache slot (see models-cache.js).
+app.get("/api/models-catalog", on("GET", () => v1("/models/route.js")));
 
 const V1_ROUTES = [
   ["OPTIONS", "/chat/completions", () => v1("/chat/completions/route.js")],

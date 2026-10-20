@@ -9,11 +9,7 @@ import { getSettings, validateApiKey } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { verifyDashboardAuthToken, getDashboardAuthSession } from "@/lib/auth/dashboardSession";
 import { hasTrustedPeerHeaders } from "@/lib/auth/trustedPeer";
-import {
-  getKeyModelRestrictions,
-  findApiKeyIdByRawKey,
-  modelAllowed,
-} from "@/lib/db/repos/keyModelRestrictionsRepo.js";
+import { getEffectiveKeyPolicy, modelAllowedForUser } from "./userModelPolicy.js";
 import { ensurePeerToken, stampPeerHeaders } from "./peer-headers.js";
 
 const CLI_TOKEN_HEADER = "x-9r-cli-token";
@@ -159,11 +155,11 @@ async function enforceKeyModelRestrictions(request, pathname) {
   const rawKey = extractApiKey(request);
   if (!rawKey) return null; // local / cli-token access carries no key → unrestricted
 
-  const keyId = await findApiKeyIdByRawKey(rawKey);
-  if (!keyId) return null;
+  const policy = await getEffectiveKeyPolicy(rawKey);
+  if (!policy) return null;
 
-  const patterns = await getKeyModelRestrictions(keyId);
-  if (!patterns) return null;
+  const { keyPatterns, ownerPatterns } = policy;
+  if (!keyPatterns?.length && !ownerPatterns?.length) return null; // fully unrestricted
 
   let model = extractRequestedModel(request, pathname);
   if (!model) {
@@ -177,7 +173,7 @@ async function enforceKeyModelRestrictions(request, pathname) {
   }
   if (!model) return null;
 
-  if (modelAllowed(patterns, model)) return null;
+  if (modelAllowedForUser(keyPatterns, ownerPatterns, model)) return null;
   return Response.json(
     { error: { message: `Model "${model}" is not allowed for this API key`, type: "access_denied", code: "model_not_allowed" } },
     { status: 403 }
@@ -192,33 +188,35 @@ function isModelsListPath(pathname) {
 }
 
 // body is the parsed JSON of a models list; returns the filtered copy or null
-// when nothing should change.
-function filterModelsBody(patterns, pathname, body) {
+// when nothing should change. The catalog must satisfy BOTH the per-key
+// restriction and the owner user's allowed-models ceiling (if bound).
+function filterModelsBody(keyPatterns, ownerPatterns, pathname, body) {
   if (!body) return null;
+  const allowed = (id) => modelAllowedForUser(keyPatterns, ownerPatterns, id);
   if (pathname.startsWith("/v1beta")) {
     if (!Array.isArray(body.models)) return null;
     const models = body.models.filter((m) =>
-      modelAllowed(patterns, String(m?.name || "").replace(/^models\//, ""))
+      allowed(String(m?.name || "").replace(/^models\//, ""))
     );
     return { ...body, models };
   }
   if (!Array.isArray(body.data)) return null;
-  const data = body.data.filter((m) => modelAllowed(patterns, String(m?.id || "")));
+  const data = body.data.filter((m) => allowed(String(m?.id || "")));
   return { ...body, data };
 }
 
 async function filterModelsResponseIfNeeded(c, pathname, res) {
   const rawKey = extractApiKey(c.req.raw);
   if (!rawKey) return res; // local/keyless → unrestricted view
-  const keyId = await findApiKeyIdByRawKey(rawKey);
-  if (!keyId) return res;
+  const policy = await getEffectiveKeyPolicy(rawKey);
+  if (!policy) return res;
 
-  const patterns = await getKeyModelRestrictions(keyId);
-  if (!patterns) return res; // unrestricted key → full catalog
+  const { keyPatterns, ownerPatterns } = policy;
+  if (!keyPatterns?.length && !ownerPatterns?.length) return res; // unrestricted key → full catalog
 
   try {
     const body = await res.clone().json();
-    const filtered = filterModelsBody(patterns, pathname, body);
+    const filtered = filterModelsBody(keyPatterns, ownerPatterns, pathname, body);
     if (!filtered) return res;
     const headers = new Headers(res.headers);
     headers.delete("content-length");

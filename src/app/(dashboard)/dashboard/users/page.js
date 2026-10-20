@@ -2,13 +2,93 @@
 
 // Fork: multi-user auth panel (hono-server/users.js backend).
 // Admin-only CRUD for dashboard users; the "My password" card works for any
-// username-session user (admins and viewers alike).
+// username-session user (admins and viewers alike). An optional allowed-models
+// list per user acts as a ceiling for every API key they own
+// (hono-server/userModelPolicy.js); empty list = all models allowed.
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, Button, Input } from "@/shared/components";
 import Modal, { ConfirmModal } from "@/shared/components/Modal";
 
 const ROLES = ["admin", "viewer"];
+
+// Searchable multi-select over the routable model catalog plus free-form
+// pattern entry (trailing "*" globs supported by the backend matcher).
+function AllowedModelsEditor({ catalog, value, onChange }) {
+  const [query, setQuery] = useState("");
+  if (!Array.isArray(value)) value = [];
+  const q = query.trim().toLowerCase();
+  const suggestions = q
+    ? catalog.filter((m) => m.toLowerCase().includes(q) && !value.includes(m)).slice(0, 30)
+    : catalog.filter((m) => !value.includes(m)).slice(0, 15);
+  const addPattern = () => {
+    const raw = query.trim();
+    if (raw && !value.includes(raw)) onChange([...value, raw]);
+    setQuery("");
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addPattern();
+            }
+          }}
+          placeholder="Search models or type a pattern (e.g. sm/gpt-4.1-*)"
+          className="text-xs"
+        />
+        {query && (
+          <Button type="button" variant="outline" size="sm" onClick={addPattern} className="whitespace-nowrap text-xs">
+            Add
+          </Button>
+        )}
+      </div>
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map((m) => (
+            <span
+              key={m}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-primary/10 text-primary"
+            >
+              {m}
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((x) => x !== m))}
+                className="text-primary/70 hover:text-primary"
+                aria-label={`Remove ${m}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {suggestions.length > 0 && (
+        <div className="max-h-40 overflow-y-auto rounded-lg border border-border divide-y divide-border/50">
+          {suggestions.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                onChange([...value, m]);
+                setQuery("");
+              }}
+              className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-black/5 dark:hover:bg-white/5"
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="text-[11px] text-text-muted">Empty list = all models allowed.</p>
+    </div>
+  );
+}
 
 export default function UsersPage() {
   const [me, setMe] = useState({ username: null, role: null, multiUser: false });
@@ -17,13 +97,14 @@ export default function UsersPage() {
   const [forbidden, setForbidden] = useState(false);
   const [notice, setNotice] = useState({ type: "", message: "" });
 
-  const [form, setForm] = useState({ username: "", password: "", role: "viewer" });
+  const [form, setForm] = useState({ username: "", password: "", role: "viewer", allowedModels: [] });
   const [creating, setCreating] = useState(false);
-  const [edit, setEdit] = useState(null); // {id, username, role, password}
+  const [edit, setEdit] = useState(null); // {id, username, role, password, allowedModels}
   const [savingEdit, setSavingEdit] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [pwSaving, setPwSaving] = useState(false);
+  const [catalog, setCatalog] = useState([]);
 
   const flash = (type, message) => {
     setNotice({ type, message });
@@ -56,6 +137,14 @@ export default function UsersPage() {
     load();
   }, [load]);
 
+  // Routable model ids for the allowed-models picker (fork catalog route).
+  useEffect(() => {
+    fetch("/api/models-catalog")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setCatalog((d?.data || []).map((m) => m.id).filter(Boolean)))
+      .catch(() => {});
+  }, []);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setCreating(true);
@@ -67,7 +156,7 @@ export default function UsersPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setForm({ username: "", password: "", role: "viewer" });
+        setForm({ username: "", password: "", role: "viewer", allowedModels: [] });
         flash("success", `User "${data.user.username}" created.`);
         load();
       } else {
@@ -86,6 +175,7 @@ export default function UsersPage() {
     try {
       const body = { role: edit.role };
       if (edit.password) body.password = edit.password;
+      body.allowedModels = edit.allowedModels || [];
       const res = await fetch(`/api/users/${edit.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -187,6 +277,7 @@ export default function UsersPage() {
                   <tr className="text-left text-text-muted border-b border-border/60">
                     <th className="py-2 pr-3 font-medium">Username</th>
                     <th className="py-2 pr-3 font-medium">Role</th>
+                    <th className="py-2 pr-3 font-medium">Models</th>
                     <th className="py-2 pr-3 font-medium">Created</th>
                     <th className="py-2 font-medium text-right">Actions</th>
                   </tr>
@@ -212,9 +303,18 @@ export default function UsersPage() {
                           {u.role}
                         </span>
                       </td>
+                      <td className="py-2 pr-3">
+                        {(u.allowedModels || []).length > 0 ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500">
+                            {(u.allowedModels || []).length} allowed
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-text-muted">all</span>
+                        )}
+                      </td>
                       <td className="py-2 pr-3 text-text-muted">{(u.createdAt || "").slice(0, 10)}</td>
                       <td className="py-2 text-right space-x-2 whitespace-nowrap">
-                        <Button variant="ghost" className="text-xs" onClick={() => setEdit({ ...u, password: "" })}>
+                        <Button variant="ghost" className="text-xs" onClick={() => setEdit({ ...u, password: "", allowedModels: u.allowedModels || [] })}>
                           Edit
                         </Button>
                         <Button variant="ghost" className="text-xs text-red-500" onClick={() => setConfirmDelete(u)}>
@@ -225,7 +325,7 @@ export default function UsersPage() {
                   ))}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-3 text-text-muted">
+                      <td colSpan={5} className="py-3 text-text-muted">
                         No users yet. Create the first admin below.
                       </td>
                     </tr>
@@ -237,30 +337,43 @@ export default function UsersPage() {
 
           <Card className="p-4">
             <h2 className="text-sm font-semibold mb-3">Create user</h2>
-            <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2 items-end">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium">Username</label>
-                <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="3–32 chars" required />
+            <form onSubmit={handleCreate} className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2 items-end">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium">Username</label>
+                  <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="3–32 chars" required />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium">Password</label>
+                  <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="min 8 chars" required />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium">Role</label>
+                  <select
+                    className="h-9 rounded-lg border border-border bg-surface px-2 text-xs"
+                    value={form.role}
+                    onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+                <Button type="submit" variant="primary" loading={creating} className="text-xs">
+                  Add
+                </Button>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium">Password</label>
-                <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="min 8 chars" required />
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium">Allowed models</label>
+                <span className="text-[10px] text-text-muted">
+                  ceiling for every API key this user creates
+                </span>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium">Role</label>
-                <select
-                  className="h-9 rounded-lg border border-border bg-surface px-2 text-xs"
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })}
-                >
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </div>
-              <Button type="submit" variant="primary" loading={creating} className="text-xs">
-                Add
-              </Button>
+              <AllowedModelsEditor
+                catalog={catalog}
+                value={form.allowedModels}
+                onChange={(allowedModels) => setForm({ ...form, allowedModels })}
+              />
             </form>
           </Card>
         </>
@@ -309,6 +422,17 @@ export default function UsersPage() {
                 onChange={(e) => setEdit({ ...edit, password: e.target.value })}
               />
             </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium">Allowed models</label>
+              <span className="text-[10px] text-text-muted">
+                ceiling for every API key this user creates (takes effect immediately)
+              </span>
+            </div>
+            <AllowedModelsEditor
+              catalog={catalog}
+              value={edit.allowedModels}
+              onChange={(allowedModels) => setEdit({ ...edit, allowedModels })}
+            />
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setEdit(null)}>Cancel</Button>
               <Button variant="primary" loading={savingEdit} onClick={handleSaveEdit}>Save</Button>

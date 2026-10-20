@@ -21,7 +21,11 @@
 //
 // Tests: tests/unit/modelsCache.test.js.
 
-const CACHED_PATHS = new Set(["/v1/models", "/api/v1/models"]);
+const CACHED_PATHS = new Set(["/v1/models", "/api/v1/models", "/api/models-catalog"]);
+// /api/models-catalog (fork: dashboard-authenticated catalog for the dashboard
+// UI) serves the exact same response as /v1/models — map it onto the /v1/models
+// cache slot so the two never thrash the single-entry cache.
+const CACHE_SLOT = { "/api/models-catalog": "/v1/models" };
 export const DEFAULT_TTL_MS = 60 * 1000;
 
 export function parseModelsCacheConfig(env = process.env) {
@@ -85,8 +89,9 @@ export function createModelsCacheMiddleware({ config = parseModelsCacheConfig(),
     // Never cache the cross-instance internal variant (different content).
     if (c.req.raw.headers.get("x-9r-internal-models-fetch") === "1") return next();
 
+    const slot = CACHE_SLOT[pathname] || pathname;
     const entry = state.entry;
-    if (entry && entry.pathname === pathname && now() - entry.storedAt < config.ttlMs) {
+    if (entry && entry.pathname === slot && now() - entry.storedAt < config.ttlMs) {
       state.hits += 1;
       return hitResponse(entry);
     }
@@ -98,7 +103,7 @@ export function createModelsCacheMiddleware({ config = parseModelsCacheConfig(),
       return;
     }
     const text = await res.text();
-    state.entry = { pathname, text, storedAt: now() };
+    state.entry = { pathname: slot, text, storedAt: now() };
     state.misses += 1;
     const headers = new Headers(res.headers);
     headers.set("X-Cache", "MISS");

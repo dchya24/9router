@@ -11,6 +11,7 @@ import {
   validateUsername,
   validatePassword,
   validateRole,
+  validateAllowedModels,
   hashPassword,
   userSummary,
   ensureUsersTable,
@@ -35,6 +36,7 @@ function makeFakeAdapter(seed = []) {
     username: u.username,
     passwordHash: u.passwordHash || hashPassword(u.password || "password123"),
     role: u.role || "admin",
+    allowedModels: u.allowedModels ? JSON.stringify(u.allowedModels) : null,
     createdAt: u.createdAt || new Date(2026, 0, 1).toISOString(),
     updatedAt: u.updatedAt || new Date(2026, 0, 1).toISOString(),
   }));
@@ -55,7 +57,7 @@ function makeFakeAdapter(seed = []) {
     },
     run(sql, params) {
       if (sql.startsWith("INSERT")) {
-        rows.push({ id: params[0], username: params[1], passwordHash: params[2], role: params[3], createdAt: params[4], updatedAt: params[5] });
+        rows.push({ id: params[0], username: params[1], passwordHash: params[2], role: params[3], allowedModels: params[4], createdAt: params[5], updatedAt: params[6] });
         return { changes: 1 };
       }
       if (sql.startsWith("UPDATE")) {
@@ -101,8 +103,37 @@ describe("validation", () => {
 
   it("userSummary never leaks the password hash", () => {
     const s = userSummary({ id: "1", username: "u", passwordHash: "secret", role: "viewer", createdAt: "t", updatedAt: "t" });
-    expect(s).toEqual({ id: "1", username: "u", role: "viewer", createdAt: "t", updatedAt: "t" });
+    expect(s).toEqual({ id: "1", username: "u", role: "viewer", allowedModels: [], createdAt: "t", updatedAt: "t" });
     expect(JSON.stringify(s)).not.toContain("secret");
+  });
+
+  it("userSummary parses the stored allowedModels JSON", () => {
+    const s = userSummary({ id: "1", username: "u", role: "viewer", allowedModels: '["sm/gpt-5.4"]', createdAt: "t", updatedAt: "t" });
+    expect(s.allowedModels).toEqual(["sm/gpt-5.4"]);
+    expect(userSummary({ id: "1", username: "u", role: "viewer", allowedModels: "not-json", createdAt: "t", updatedAt: "t" }).allowedModels).toEqual([]);
+  });
+
+  it("validates the allowed-models list shape", () => {
+    expect(validateAllowedModels(undefined)).toEqual({ provided: false, list: [] });
+    expect(validateAllowedModels([]).provided).toBe(true);
+    expect(validateAllowedModels([" sm/gpt-5.4 ", ""]).list).toEqual(["sm/gpt-5.4"]);
+    expect(validateAllowedModels(["a", "a"]).list).toEqual(["a"]);
+    expect(validateAllowedModels("sm/gpt-5.4").error).toBeTruthy();
+    expect(validateAllowedModels(Array.from({ length: 501 }, (_, i) => `m${i}`)).error).toBeTruthy();
+  });
+
+  it("stores and updates the allowed-models ceiling", async () => {
+    const a = makeFakeAdapter();
+    const res = await createUser(a, { username: "alice", password: "password123", role: "admin", allowedModels: ["sm/gpt-5.4", "gpt-4.1-*"] });
+    expect(res.user.allowedModels).toEqual(["sm/gpt-5.4", "gpt-4.1-*"]);
+
+    const row = findUserByUsername(a, "alice");
+    expect((await updateUser(a, row.id, { allowedModels: [] })).user.allowedModels).toEqual([]);
+    expect((await updateUser(a, row.id, { allowedModels: "not-an-array" })).error).toBeTruthy();
+    // Unrelated updates keep the stored list.
+    const again = await createUser(a, { username: "bob", password: "password123", role: "viewer", allowedModels: ["keep-me"] });
+    await updateUser(a, again.user.id, { password: "newpassword9" });
+    expect(findUserByUsername(a, "bob").allowedModels).toBe(JSON.stringify(["keep-me"]));
   });
 });
 
