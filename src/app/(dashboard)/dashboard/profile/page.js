@@ -30,6 +30,11 @@ export default function ProfilePage() {
   const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
   const [passStatus, setPassStatus] = useState({ type: "", message: "" });
   const [passLoading, setPassLoading] = useState(false);
+  // Fork: with multi-user auth active, "Security" changes the password of the
+  // logged-in dashboard user (PATCH /api/users/me) instead of the legacy
+  // shared dashboard password (PATCH /api/settings).
+  const [me, setMe] = useState({ loading: true, multiUser: false, username: null });
+  const passMode = me.multiUser && me.username ? "user" : "legacy";
   const [dbLoading, setDbLoading] = useState(false);
   const [dbStatus, setDbStatus] = useState({ type: "", message: "" });
   const [dbAuth, setDbAuth] = useState({ open: false, mode: "", password: "" });
@@ -85,6 +90,28 @@ export default function ProfilePage() {
   useEffect(() => {
     if (typeof window !== "undefined")
       setIsRemoteHost(!["localhost", "127.0.0.1", "::1"].includes(window.location.hostname));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/auth/status")
+      .then((res) => res.json())
+      .then((data) => {
+        // users-mode handles login; a session created by the legacy shared
+        // password carries no username (displayName falls back to the
+        // upstream "Password user" placeholder), so keep it out of user mode.
+        const isUsernameSession =
+          data.multiUser === true &&
+          data.authenticated === true &&
+          data.loginMethod === "Password" &&
+          data.displayName &&
+          data.displayName !== "Password user";
+        setMe({
+          loading: false,
+          multiUser: data.multiUser === true,
+          username: isUsernameSession ? data.displayName : null,
+        });
+      })
+      .catch(() => setMe((prev) => ({ ...prev, loading: false })));
   }, []);
 
   useEffect(() => {
@@ -237,17 +264,27 @@ export default function ProfilePage() {
     setPassLoading(true);
     setPassStatus({ type: "", message: "" });
 
-    try {
-      const res = await fetch("/api/settings", {
+    const body = JSON.stringify({
+      currentPassword: passwords.current,
+      newPassword: passwords.new,
+    });
+    const submit = async (target) => {
+      const res = await fetch(target, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentPassword: passwords.current,
-          newPassword: passwords.new,
-        }),
+        body,
       });
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    };
 
-      const data = await res.json();
+    try {
+      let { res, data } = await submit(passMode === "user" ? "/api/users/me" : "/api/settings");
+      // A legacy shared-password session surviving into users-mode has no
+      // dashboardUsers row — change the shared password instead.
+      if (!res.ok && passMode === "user" && data.error === "Username session required.") {
+        ({ res, data } = await submit("/api/settings"));
+      }
 
       if (res.ok) {
         setPassStatus({ type: "success", message: "Password updated successfully" });
@@ -881,9 +918,15 @@ export default function ProfilePage() {
                 disabled={loading}
               />
             </div>
-            {settings.requireLogin === true && (
+            {passMode === "user" && (
+              <p className="text-xs sm:text-sm text-text-muted">
+                Change the dashboard password for account{" "}
+                <span className="font-medium text-text-main">{me.username}</span>.
+              </p>
+            )}
+            {!me.loading && (passMode === "user" || settings.requireLogin === true) && (
               <form onSubmit={handlePasswordChange} className="flex flex-col gap-4 pt-4 border-t border-border/50">
-                {settings.hasPassword && (
+                {(passMode === "user" || settings.hasPassword) && (
                   <div className="flex flex-col gap-2">
                     <label className="text-xs sm:text-sm font-medium">Current Password</label>
                     <Input
@@ -912,6 +955,9 @@ export default function ProfilePage() {
                       onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
                       required
                     />
+                    {passMode === "user" && (
+                      <p className="text-xs text-text-muted">At least 8 characters.</p>
+                    )}
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-xs sm:text-sm font-medium">Confirm New Password</label>
@@ -933,7 +979,11 @@ export default function ProfilePage() {
 
                 <div className="pt-2">
                   <Button type="submit" variant="primary" loading={passLoading} className="w-full sm:w-auto">
-                    {settings.hasPassword ? "Update Password" : "Set Password"}
+                    {passMode === "user"
+                      ? "Change Password"
+                      : settings.hasPassword
+                        ? "Update Password"
+                        : "Set Password"}
                   </Button>
                 </div>
               </form>
