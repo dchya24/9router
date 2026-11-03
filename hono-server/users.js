@@ -29,6 +29,11 @@ import { getSettings } from "@/lib/localDb";
 import { isOidcConfigured } from "@/lib/auth/oidc";
 import { isSamlConfigured } from "@/lib/auth/saml.js";
 import { checkLock, recordFail, recordSuccess, getClientIp } from "@/lib/auth/loginLimiter";
+import {
+  canManageKey,
+  filterKeysForSession,
+  filterRestrictionsForSession,
+} from "./accessControl.js";
 
 export const USERNAME_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
 export const MIN_PASSWORD_LENGTH = 8;
@@ -372,17 +377,68 @@ export function registerUserAuth(app, { on, api, apiKeys }) {
     return c.json({ ok: true });
   });
 
-  // ── API-key ownership binding (fork) ─────────────────────────────────────
+  // ── API-key ownership binding + self-service (fork) ─────────────────────
   // Keys created from a username session are bound to that user and inherit
   // their allowed-models ceiling (hono-server/userModelPolicy.js). Legacy
-  // shared-password sessions create unbound, unrestricted keys. Registered
-  // BEFORE the upstream keys group so these routes win.
+  // shared-password sessions create unbound, unrestricted keys. Viewers may
+  // self-serve their OWN keys only (create/list/manage) — ownership is checked
+  // here because the guard only lets the request through. Registered BEFORE
+  // the upstream keys group so these routes win.
+  const sessionOf = (c) => getDashboardAuthSession(authTokenFrom(c.req.raw));
+
+  // 403 when a viewer tries to touch a key it does not own.
+  const requireOwnership = async (c, keyId) => {
+    const session = await sessionOf(c);
+    if (!session?.sub || session.role !== "viewer") return null;
+    const { getApiKeyOwner } = await import("./userModelPolicy.js");
+    const owner = keyId ? await getApiKeyOwner(keyId) : null;
+    if (!canManageKey(session, owner)) {
+      return c.json({ error: "Forbidden: you can only manage your own API keys." }, 403);
+    }
+    return null;
+  };
+
+  // GET responses carry full key secrets — viewers must only see their keys.
+  const filterKeysResponse = async (c, res) => {
+    const session = await sessionOf(c);
+    if (!session?.sub || session.role !== "viewer" || !res?.ok) return res;
+    const body = await res.clone().json().catch(() => null);
+    if (!Array.isArray(body?.keys)) return res;
+    const { getAllApiKeyOwners } = await import("./userModelPolicy.js");
+    const keys = filterKeysForSession(body.keys, await getAllApiKeyOwners(), session);
+    return c.json({ keys }, res.status, { "Cache-Control": "no-store" });
+  };
+
+  const filterRestrictionsResponse = async (c, res) => {
+    const session = await sessionOf(c);
+    if (!session?.sub || session.role !== "viewer" || !res?.ok) return res;
+    const body = await res.clone().json().catch(() => null);
+    if (!Array.isArray(body?.restrictions)) return res;
+    const { getAllApiKeyOwners } = await import("./userModelPolicy.js");
+    const restrictions = filterRestrictionsForSession(
+      body.restrictions,
+      await getAllApiKeyOwners(),
+      session
+    );
+    return c.json({ restrictions }, res.status, { "Cache-Control": "no-store" });
+  };
+
   if (apiKeys) {
+    const listKeysHandler = on("GET", () => apiKeys("/route.js"));
+    app.get("/api/keys", async (c) => filterKeysResponse(c, await listKeysHandler(c)));
+
+    const getKeyHandler = on("GET", () => apiKeys("/[id]/route.js"), { id: "id" });
+    app.get("/api/keys/:id", async (c) => {
+      const denied = await requireOwnership(c, c.req.param("id"));
+      if (denied) return denied;
+      return getKeyHandler(c);
+    });
+
     const createKeyHandler = on("POST", () => apiKeys("/route.js"));
     app.post("/api/keys", async (c) => {
       const res = await createKeyHandler(c);
       if (res?.status === 201) {
-        const session = await getDashboardAuthSession(authTokenFrom(c.req.raw));
+        const session = await sessionOf(c);
         if (session?.sub) {
           const body = await res.clone().json().catch(() => null);
           if (body?.id) {
@@ -399,9 +455,18 @@ export function registerUserAuth(app, { on, api, apiKeys }) {
       return res;
     });
 
+    const updateKeyHandler = on("PUT", () => apiKeys("/[id]/route.js"), { id: "id" });
+    app.put("/api/keys/:id", async (c) => {
+      const denied = await requireOwnership(c, c.req.param("id"));
+      if (denied) return denied;
+      return updateKeyHandler(c);
+    });
+
     const deleteKeyHandler = on("DELETE", () => apiKeys("/[id]/route.js"), { id: "id" });
     app.delete("/api/keys/:id", async (c) => {
       const id = c.req.param("id");
+      const denied = await requireOwnership(c, id);
+      if (denied) return denied;
       const res = await deleteKeyHandler(c);
       if (res?.ok) {
         try {
@@ -410,6 +475,33 @@ export function registerUserAuth(app, { on, api, apiKeys }) {
         } catch { /* stale kv rows are harmless */ }
       }
       return res;
+    });
+  }
+
+  // ── Per-key model restrictions: same ownership rules ─────────────────────
+  {
+    const loadKeyModelsRoute = () =>
+      import(new URL("../src/routes/key-models/route.js", import.meta.url).href);
+
+    const listRestrictionsHandler = on("GET", loadKeyModelsRoute);
+    app.get("/api/key-models", async (c) =>
+      filterRestrictionsResponse(c, await listRestrictionsHandler(c))
+    );
+
+    const setRestrictionsHandler = on("PUT", loadKeyModelsRoute);
+    app.put("/api/key-models", async (c) => {
+      const body = await c.req.raw.clone().json().catch(() => ({}));
+      const denied = await requireOwnership(c, body?.keyId);
+      if (denied) return denied;
+      return setRestrictionsHandler(c);
+    });
+
+    const deleteRestrictionsHandler = on("DELETE", loadKeyModelsRoute);
+    app.delete("/api/key-models", async (c) => {
+      const keyId = new URL(c.req.url).searchParams.get("keyId");
+      const denied = await requireOwnership(c, keyId);
+      if (denied) return denied;
+      return deleteRestrictionsHandler(c);
     });
   }
 }

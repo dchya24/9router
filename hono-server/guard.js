@@ -10,6 +10,7 @@ import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { verifyDashboardAuthToken, getDashboardAuthSession } from "@/lib/auth/dashboardSession";
 import { hasTrustedPeerHeaders } from "@/lib/auth/trustedPeer";
 import { getEffectiveKeyPolicy, modelAllowedForUser } from "./userModelPolicy.js";
+import { viewerWriteBlocked } from "./accessControl.js";
 import { ensurePeerToken, stampPeerHeaders } from "./peer-headers.js";
 
 const CLI_TOKEN_HEADER = "x-9r-cli-token";
@@ -251,15 +252,10 @@ async function hasValidToken(request) {
 
 // Fork: multi-user roles. Viewer sessions (JWT role claim = "viewer") get
 // read-only access to the admin API — mutating /api/* methods are rejected,
-// except their own session endpoints (logout, self password change). Legacy
-// shared-password tokens carry no role and remain fully privileged.
-const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const VIEWER_MUTABLE = new Set(["/api/auth/logout", "/api/auth/login", "/api/users/me"]);
-function viewerBlocked(method, pathname) {
-  if (!MUTATING_METHODS.has(method)) return false;
-  if (!pathname.startsWith("/api/")) return false;
-  return !VIEWER_MUTABLE.has(pathname);
-}
+// except their own session endpoints and self-service API-key management
+// (ownership rules live in ./accessControl.js; the users.js route overrides
+// enforce them). Legacy shared-password tokens carry no role and remain fully
+// privileged.
 
 // Read settings directly from DB to avoid self-fetch deadlock in middleware
 async function loadSettings() {
@@ -341,7 +337,7 @@ export function registerGuards(app) {
       if (await hasValidCliToken(c.req.raw) || await isAuthenticated(c.req.raw)) {
         // Fork: viewers are read-only on the admin API surface. Legacy
         // shared-password tokens carry no role claim and stay privileged.
-        if (viewerBlocked(c.req.method, pathname)) {
+        if (viewerWriteBlocked(c.req.method, pathname)) {
           const session = await getDashboardAuthSession(readCookie(c.req.raw, "auth_token"));
           if (session?.role === "viewer") {
             return c.json({ error: "Forbidden: viewer role is read-only." }, 403);

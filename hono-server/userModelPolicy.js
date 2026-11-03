@@ -61,6 +61,13 @@ export async function deleteApiKeyOwner(keyId, db = null) {
   db.run(`DELETE FROM kv WHERE scope = ? AND key = ?`, [OWNER_SCOPE, keyId]);
 }
 
+// All bindings at once — used to filter the dashboard key list per session.
+export async function getAllApiKeyOwners(db = null) {
+  db ??= await getAdapter();
+  const rows = db.all(`SELECT key, value FROM kv WHERE scope = ?`, [OWNER_SCOPE]) || [];
+  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+
 export async function getUserAllowedModels(username, db = null) {
   if (!username) return null;
   db ??= await getAdapter();

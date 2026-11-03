@@ -12,6 +12,7 @@ import {
   setApiKeyOwner,
   getApiKeyOwner,
   deleteApiKeyOwner,
+  getAllApiKeyOwners,
   getUserAllowedModels,
 } from "../../hono-server/userModelPolicy.js";
 
@@ -34,7 +35,13 @@ function makeFakeAdapter({ users = [], apiKeys = [] } = {}) {
       }
       throw new Error(`fake adapter: unexpected get: ${sql}`);
     },
-    all() {
+    all(sql, params) {
+      if (sql.includes("FROM kv WHERE scope = ?")) {
+        const prefix = `${params[0]}\u0000`;
+        return [...kv.entries()]
+          .filter(([k]) => k.startsWith(prefix))
+          .map(([k, value]) => ({ key: k.slice(prefix.length), value }));
+      }
       return [];
     },
     run(sql, params) {
@@ -95,6 +102,13 @@ describe("key-owner binding (kv scope)", () => {
     expect(await getApiKeyOwner("key-1", a)).toBe("bob");
     await deleteApiKeyOwner("key-1", a);
     expect(await getApiKeyOwner("key-1", a)).toBeNull();
+  });
+
+  it("lists all bindings for dashboard key-list filtering", async () => {
+    const a = makeFakeAdapter();
+    await setApiKeyOwner("key-1", "alice", a);
+    await setApiKeyOwner("key-2", "bob", a);
+    expect(await getAllApiKeyOwners(a)).toEqual({ "key-1": "alice", "key-2": "bob" });
   });
 });
 
