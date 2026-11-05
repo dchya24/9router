@@ -65,6 +65,7 @@ Thanks.md
 PUBLIC.en.md
 PR/*
 package-lock.json
+bun.lock
 
 
 #Ignore vscode AI rules
