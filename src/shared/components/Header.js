@@ -105,41 +105,6 @@ const getPageInfo = (pathname) => {
       icon: "data_usage",
       breadcrumbs: [],
     };
-  if (pathname.includes("/mitm"))
-    return {
-      title: "MITM Proxy",
-      description: "Intercept CLI tool traffic and route through 9Router",
-      icon: "security",
-      breadcrumbs: [],
-    };
-  if (pathname.includes("/token-saver"))
-    return {
-      title: "Token Saver",
-      description: "Compress prompts and outputs to save tokens",
-      icon: "savings",
-      breadcrumbs: [],
-    };
-  if (pathname.includes("/cli-tools"))
-    return {
-      title: "CLI Tools",
-      description: "Configure CLI tools",
-      icon: "terminal",
-      breadcrumbs: [],
-    };
-  if (pathname.includes("/proxy-pools"))
-    return {
-      title: "Proxy Pools",
-      description: "Manage your proxy pool configurations",
-      icon: "lan",
-      breadcrumbs: [],
-    };
-  if (pathname.includes("/skills"))
-    return {
-      title: "Agent Skills",
-      description: "Copy a link and paste to your AI to use 9Router — no install needed",
-      icon: "extension",
-      breadcrumbs: [],
-    };
   if (pathname.includes("/endpoint"))
     return {
       title: "Endpoint",

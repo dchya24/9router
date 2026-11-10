@@ -1,3 +1,12 @@
+# v0.5.69-hono.8 (unreleased)
+
+## Features
+- **Dashboard**: remove the Token Saver, CLI Tools, Proxy Pools and Skills pages, plus the hidden MITM proxy page — together with their sidebar/header entries and APIs (`/api/headroom/*`, `/api/proxy-pools/*`, `/api/cli-tools/*`). PXPIPE keeps its own page and API.
+- **Token savers**: drop RTK tool_result compression, Headroom proxy compression, Caveman and Ponytail system-prompt injection (and the `X-9Router-Token-Saver` header). PXPIPE remains. Settings keys `rtkEnabled`/`headroom*`/`caveman*`/`ponytail*` removed with their defaults.
+- **Proxy pools**: remove the runtime pool resolution, the proxy-pool storage table/repo, and the pool selectors in the provider + usage dashboards. Per-connection legacy proxy fields are unchanged; stored `proxyPoolId` values are ignored.
+- **CLI launcher**: remove the CLI Tools menu and the RTK/Headroom toggles.
+- **Providers**: free no-auth providers now show a plain "no authentication required" card.
+
 # v0.5.69 (2026-09-05)
 
 ## Features

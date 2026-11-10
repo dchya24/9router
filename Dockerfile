@@ -42,10 +42,9 @@ ENV DATA_DIR=/app/data
 ENV DASHBOARD_EXPORT_DIR=/app/out
 # Containers never use the Antigravity MITM (sudo/DNS/hosts edits) — hard-off.
 ENV NINEROUTER_DISABLE_MITM=1
-# Workload gates: tunnel/tailscale watchdogs, headroom reverse proxy, pxpipe
-# loader. Unset any of these to re-enable that surface.
+# Workload gates: tunnel/tailscale watchdogs, pxpipe loader. Unset any of
+# these to re-enable that surface.
 ENV NINEROUTER_DISABLE_TUNNEL=1
-ENV NINEROUTER_DISABLE_HEADROOM=1
 ENV NINEROUTER_DISABLE_PXPIPE=1
 
 # --chown avoids a later `chown -R /app`, which would re-copy every file into a

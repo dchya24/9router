@@ -358,38 +358,6 @@ async function deleteCombo(id) {
 }
 
 // ============================================================================
-// CLI TOOLS API
-// ============================================================================
-
-/**
- * Get CLI tool settings
- * @param {string} tool - Tool name: claude | codex | droid | openclaw
- * @returns {Promise<Object>} { success, data: { installed, has9Router, ... } }
- */
-async function getCliToolSettings(tool) {
-  return makeRequest("GET", `/api/cli-tools/${tool}-settings`);
-}
-
-/**
- * Apply CLI tool settings (POST)
- * @param {string} tool - Tool name: claude | codex | droid | openclaw
- * @param {Object} body - Payload depends on tool
- * @returns {Promise<Object>} { success, data }
- */
-async function applyCliToolSettings(tool, body) {
-  return makeRequest("POST", `/api/cli-tools/${tool}-settings`, body);
-}
-
-/**
- * Reset CLI tool settings (DELETE)
- * @param {string} tool - Tool name: claude | codex | droid | openclaw
- * @returns {Promise<Object>} { success, data }
- */
-async function resetCliToolSettings(tool) {
-  return makeRequest("DELETE", `/api/cli-tools/${tool}-settings`);
-}
-
-// ============================================================================
 // SETTINGS API
 // ============================================================================
 
@@ -529,9 +497,6 @@ module.exports = {
   deleteCombo,
   
   // CLI Tools
-  getCliToolSettings,
-  applyCliToolSettings,
-  resetCliToolSettings,
 
   // Settings
   getSettings,

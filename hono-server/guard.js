@@ -57,8 +57,6 @@ const ALWAYS_PROTECTED = [
 
 // Routes that spawn child processes or read host secrets — restrict to localhost.
 const LOCAL_ONLY_PATHS = [
-  "/api/cli-tools/cowork-settings",
-  "/api/cli-tools/antigravity-mitm",
   "/api/mcp/",
   "/api/tunnel/tailscale-install",
   "/api/tunnel/tailscale-enable",
@@ -69,9 +67,6 @@ const LOCAL_ONLY_PATHS = [
   "/api/oauth/cursor/auto-import",
   "/api/oauth/kiro/auto-import",
   "/api/auth/reset-password",
-  "/api/headroom/start",
-  "/api/headroom/stop",
-  "/api/headroom/proxy",
 ];
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);

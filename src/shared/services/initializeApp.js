@@ -40,8 +40,8 @@ export const MITM_DISABLED = process.env.NINEROUTER_DISABLE_MITM === "1";
 // NINEROUTER_DISABLE_TUNNEL skips tunnel/tailscale resume, cloudflared
 // ensure/download, and the monitoring intervals.
 export const TUNNEL_DISABLED = process.env.NINEROUTER_DISABLE_TUNNEL === "1";
-// NINEROUTER_DISABLE_HEADROOM / NINEROUTER_DISABLE_PXPIPE are handled at
-// registration time in hono-server/server.js (modules never load).
+// NINEROUTER_DISABLE_PXPIPE is handled at registration time in
+// hono-server/server.js (the module never loads).
 
 // Defer heavy startup work so the first HTTP request (login → dashboard) isn't
 // starved by DB cleanup, cloudflared download, lsof/DNS probes and OAuth pings.

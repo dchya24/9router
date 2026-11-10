@@ -11,6 +11,8 @@ lists. Upstream files under `src/sse`, `open-sse`, `src/lib` stay untouched, so
 
 ### Workload gates: tunnel / headroom / pxpipe (2026-09-17)
 
+> **2026-11-10**: `NINEROUTER_DISABLE_HEADROOM` and the `/api/headroom/*` surface were removed with the Token Saver dashboard. Kept for the historical record.
+
 Same pattern as `NINEROUTER_DISABLE_MITM`, for deployments that never use the
 side-process surfaces. Each flag removes its group from registration entirely
 — modules (spawners, cloudflared downloader, DNS/mitm code) never load, and

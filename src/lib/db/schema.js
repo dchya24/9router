@@ -61,20 +61,6 @@ export const TABLES = {
     },
     indexes: ["CREATE INDEX IF NOT EXISTS idx_pn_type ON providerNodes(type)"],
   },
-  proxyPools: {
-    columns: {
-      id: "TEXT PRIMARY KEY",
-      isActive: "INTEGER DEFAULT 1",
-      testStatus: "TEXT",
-      data: "TEXT NOT NULL",
-      createdAt: "TEXT NOT NULL",
-      updatedAt: "TEXT NOT NULL",
-    },
-    indexes: [
-      "CREATE INDEX IF NOT EXISTS idx_pp_active ON proxyPools(isActive)",
-      "CREATE INDEX IF NOT EXISTS idx_pp_status ON proxyPools(testStatus)",
-    ],
-  },
   apiKeys: {
     columns: {
       id: "TEXT PRIMARY KEY",

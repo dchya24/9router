@@ -13,9 +13,8 @@
 // createServer wrapper and its h2c downgrade are gone.
 //
 // Env: PORT (default 20127), HOST (default 0.0.0.0), DATA_DIR.
-// NINEROUTER_DISABLE_MITM=1: never auto-start the Antigravity MITM process and
-// make the /api/cli-tools/antigravity-mitm* endpoints answer 503. Recommended
-// for container deployments.
+// NINEROUTER_DISABLE_MITM=1: never auto-start the Antigravity MITM process.
+// Recommended for container deployments.
 
 import { Hono } from "hono";
 import { registerGuards } from "./guard.js";
@@ -59,7 +58,6 @@ const apiProviders = loaderFor("providers");
 const apiModels = loaderFor("models");
 const apiKeys = loaderFor("keys");
 const apiCombos = loaderFor("combos");
-const apiPools = loaderFor("proxy-pools");
 const apiSettings = loaderFor("settings");
 const apiVersion = loaderFor("version");
 const apiPricing = loaderFor("pricing");
@@ -69,12 +67,10 @@ const apiHealth = loaderFor("health");
 const apiTranslator = loaderFor("translator");
 const apiMcp = loaderFor("mcp");
 const apiPxpipe = loaderFor("pxpipe");
-const apiHeadroom = loaderFor("headroom");
 const apiMedia = loaderFor("media-providers");
 const apiTunnel = loaderFor("tunnel");
 const apiAuth = loaderFor("auth");
 const apiOauth = loaderFor("oauth");
-const apiCliTools = loaderFor("cli-tools");
 const apiShutdown = loaderFor("shutdown");
 const apiProviderNodes = loaderFor("provider-nodes");
 const apiMachineId = loaderFor("machine-id");
@@ -315,20 +311,6 @@ const COMBOS_ROUTES = [
 ];
 register("/api", COMBOS_ROUTES);
 
-// ─── Admin group: proxy-pools ───────────────────────────────────────────────
-const POOLS_ROUTES = [
-  ["GET", "/proxy-pools", () => apiPools("/route.js")],
-  ["POST", "/proxy-pools", () => apiPools("/route.js")],
-  ["POST", "/proxy-pools/cloudflare-deploy", () => apiPools("/cloudflare-deploy/route.js")],
-  ["POST", "/proxy-pools/deno-deploy", () => apiPools("/deno-deploy/route.js")],
-  ["POST", "/proxy-pools/vercel-deploy", () => apiPools("/vercel-deploy/route.js")],
-  ["GET", "/proxy-pools/:id", () => apiPools("/[id]/route.js"), { id: "id" }],
-  ["PUT", "/proxy-pools/:id", () => apiPools("/[id]/route.js"), { id: "id" }],
-  ["DELETE", "/proxy-pools/:id", () => apiPools("/[id]/route.js"), { id: "id" }],
-  ["POST", "/proxy-pools/:id/test", () => apiPools("/[id]/test/route.js"), { id: "id" }],
-];
-register("/api", POOLS_ROUTES);
-
 // ─── Admin group: settings ──────────────────────────────────────────────────
 const SETTINGS_ROUTES = [
   ["GET", "/settings", () => apiSettings("/route.js")],
@@ -368,16 +350,15 @@ register("/api", [
   ["POST", "/mcp/:plugin/message", () => apiMcp("/[plugin]/message/route.js"), { id: "plugin" }],
 ]);
 
-// ─── Admin batch: pxpipe, headroom, media-providers, tunnel ────────────────
-// pxpipe start/stop/restart/install and headroom/tunnel lifecycle POSTs spawn
-// or control host processes — registered here, never exercised in tests.
+// ─── Admin batch: pxpipe, media-providers, tunnel ─────────────────────────
+// pxpipe start/stop/restart/install and tunnel lifecycle POSTs spawn or
+// control host processes — registered here, never exercised in tests.
 //
 // Optional workload gates (fork feature; goal: smallest possible runtime).
 // When set to "1" the whole group is not even registered — modules never load
 // and the paths fall through to 404 without importing spawners, downloaders,
 // or DNS/mitm code:
 //   NINEROUTER_DISABLE_TUNNEL   /api/tunnel/*
-//   NINEROUTER_DISABLE_HEADROOM /api/headroom/*
 //   NINEROUTER_DISABLE_PXPIPE   /api/pxpipe/*
 if (process.env.NINEROUTER_DISABLE_PXPIPE !== "1") {
   register("/api", [
@@ -389,26 +370,6 @@ if (process.env.NINEROUTER_DISABLE_PXPIPE !== "1") {
     ["GET", "/pxpipe/stats", () => apiPxpipe("/stats/route.js")],
     ["GET", "/pxpipe/status", () => apiPxpipe("/status/route.js")],
     ["POST", "/pxpipe/stop", () => apiPxpipe("/stop/route.js")],
-  ]);
-}
-if (process.env.NINEROUTER_DISABLE_HEADROOM !== "1") {
-  register("/api", [
-    ["GET", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
-    ["POST", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
-    ["DELETE", "/headroom/extras", () => apiHeadroom("/extras/route.js")],
-    ["POST", "/headroom/restart", () => apiHeadroom("/restart/route.js")],
-    ["POST", "/headroom/start", () => apiHeadroom("/start/route.js")],
-    ["GET", "/headroom/status", () => apiHeadroom("/status/route.js")],
-    ["POST", "/headroom/stop", () => apiHeadroom("/stop/route.js")],
-    // Reverse proxy to the headroom app (all methods; LOCAL_ONLY /headroom/start,
-    // /stop, /proxy paths are gated by the guard above).
-    ["GET", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-    ["POST", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-    ["PUT", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-    ["PATCH", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-    ["DELETE", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-    ["HEAD", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
-    ["OPTIONS", "/headroom/proxy/*", () => apiHeadroom("/proxy/[...path]/route.js"), { catchAll: "path", catchAllPrefix: "/api/headroom/proxy" }],
   ]);
 }
 register("/api", [
@@ -465,43 +426,6 @@ register("/api", [
   ["GET", "/oauth/:provider/:action", () => apiOauth("/[provider]/[action]/route.js"), { params: ["provider", "action"] }],
   ["POST", "/oauth/:provider/:action", () => apiOauth("/[provider]/[action]/route.js"), { params: ["provider", "action"] }],
 ]);
-
-// ─── Admin group: cli-tools (LAST batch — every /api route now lives here) ──
-// *-settings POST/DELETE write real tool config files on the host — registered
-// but never exercised in tests. antigravity-mitm + cowork-settings are
-// LOCAL_ONLY (guard gates them to CLI token or local+authed).
-register("/api", [
-  ["GET", "/cli-tools/all-statuses", () => apiCliTools("/all-statuses/route.js")],
-  ["GET", "/cli-tools/antigravity-mitm", () => apiCliTools("/antigravity-mitm/route.js")],
-  ["POST", "/cli-tools/antigravity-mitm", () => apiCliTools("/antigravity-mitm/route.js")],
-  ["DELETE", "/cli-tools/antigravity-mitm", () => apiCliTools("/antigravity-mitm/route.js")],
-  ["PATCH", "/cli-tools/antigravity-mitm", () => apiCliTools("/antigravity-mitm/route.js")],
-  ["GET", "/cli-tools/antigravity-mitm/alias", () => apiCliTools("/antigravity-mitm/alias/route.js")],
-  ["PUT", "/cli-tools/antigravity-mitm/alias", () => apiCliTools("/antigravity-mitm/alias/route.js")],
-  ["GET", "/cli-tools/cowork-mcp-registry", () => apiCliTools("/cowork-mcp-registry/route.js")],
-  ["POST", "/cli-tools/cowork-mcp-tools", () => apiCliTools("/cowork-mcp-tools/route.js")],
-]);
-const CLI_SETTINGS = [
-  ["claude-settings", ["GET", "POST", "DELETE"]],
-  ["cline-settings", ["GET", "POST", "DELETE"]],
-  ["codex-settings", ["GET", "POST", "DELETE"]],
-  ["copilot-settings", ["GET", "POST", "DELETE"]],
-  ["cowork-settings", ["GET", "POST", "DELETE"]],
-  ["deepseek-tui-settings", ["GET", "POST", "DELETE"]],
-  ["devin-settings", ["GET"]],
-  ["droid-settings", ["GET", "POST", "DELETE"]],
-  ["grok-build-settings", ["GET", "POST", "DELETE"]],
-  ["hermes-settings", ["GET", "POST", "DELETE"]],
-  ["jcode-settings", ["GET", "POST", "DELETE"]],
-  ["kilo-settings", ["GET", "POST", "DELETE"]],
-  ["openclaw-settings", ["GET", "POST", "DELETE"]],
-  ["opencode-settings", ["GET", "POST", "PATCH", "DELETE"]],
-];
-for (const [name, methods] of CLI_SETTINGS) {
-  for (const method of methods) {
-    register("/api", [[method, `/cli-tools/${name}`, () => apiCliTools(`/${name}/route.js`)]]);
-  }
-}
 
 // ─── ALWAYS_PROTECTED: kills the host process — never called in tests ──────
 register("/api", [["POST", "/shutdown", () => apiShutdown("/route.js")]]);

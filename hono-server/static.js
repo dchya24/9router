@@ -51,7 +51,6 @@ export function createStaticHandler(exportDir) {
     ["/dashboard/media-providers/", 1, "/dashboard/media-providers/shell.html"],
     ["/dashboard/media-providers/", 2, "/dashboard/media-providers/shell/shell.html"],
     ["/dashboard/providers/", 1, "/dashboard/providers/shell.html"],
-    ["/dashboard/cli-tools/", 1, "/dashboard/cli-tools/shell.html"],
   ];
 
   const shellFor = (pathname) => {
