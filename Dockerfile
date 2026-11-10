@@ -10,7 +10,7 @@ FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
 
-COPY package.json bun.lock ./
+COPY package.json ./
 RUN --mount=type=cache,target=/root/.npm \
   npm install
 
