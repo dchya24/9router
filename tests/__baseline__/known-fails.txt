@@ -52,7 +52,6 @@ tests/unit/cursor-agent-proto.test.js :: Cursor AgentService executor helpers (c
 tests/unit/cursor-agent-proto.test.js :: Cursor AgentService executor helpers (cursor.js) isAgentCapableRequest accepts request with tools declared
 tests/unit/cursor-agent-proto.test.js :: Cursor AgentService executor helpers (cursor.js) isAgentCapableRequest rejects missing messages
 tests/unit/cursor-agent-proto.test.js :: Cursor AgentService executor helpers (cursor.js) isAgentCapableRequest rejects non-text (image) content
-tests/unit/cursor-models.test.js :: Cursor live model catalog fails open when the Cursor catalog request fails
 tests/unit/cursor-models.test.js :: Cursor live model catalog fetches the account-specific catalog and caches it
 tests/unit/db-concurrent.test.js :: DB Concurrency — atomic safety 100 parallel saveRequestUsage → no count loss
 tests/unit/db-concurrent.test.js :: DB Concurrency — atomic safety daily summary aggregates correctly under parallel writes
@@ -62,7 +61,6 @@ tests/unit/image-fetch-hardening.test.js :: fetchImageAsBase64 hardening accepts
 tests/unit/kiro-terminal-integrity.test.js :: Kiro terminal integrity recovery bounds the retry HTTP error body
 tests/unit/kiro-terminal-integrity.test.js :: Kiro terminal integrity recovery surfaces retry HTTP failures as SSE after heartbeat commits headers
 tests/unit/mimo-free.live.test.js :: MiMo Free anti-abuse gate (live) chat WITH Chrome User-Agent → 200
-tests/unit/mimo-free.live.test.js :: MiMo Free bootstrap (live) bootstrap returns 200 with JWT
 tests/unit/oauth-cursor-auto-import.test.js :: GET /api/oauth/cursor/auto-import extracts tokens using exact keys
 tests/unit/oauth-cursor-auto-import.test.js :: GET /api/oauth/cursor/auto-import falls back to fuzzy key matching on macOS when exact keys are missing
 tests/unit/oauth-cursor-auto-import.test.js :: GET /api/oauth/cursor/auto-import linux uses single hardcoded path and original error message
@@ -91,7 +89,6 @@ tests/unit/openai-to-kiro.test.js :: openaiToKiroRequest thinking budget normali
 tests/unit/openai-to-kiro.test.js :: openaiToKiroRequest thinking budget normalizes unsupported Kiro intensity suffix for glm-5-thinking-agentic(medium)
 tests/unit/openai-to-kiro.test.js :: openaiToKiroRequest thinking budget uses Claude thinking.budget_tokens as max_thinking_length
 tests/unit/openai-to-kiro.test.js :: openaiToKiroRequest thinking budget uses the default budget for synthetic -thinking models with no explicit config
-tests/unit/relative-pkg-imports.test.js :: relative package.json imports resolve after tree moves the /api/version route module loads and reports the app version
 tests/unit/request-details-tab.test.js :: backupDbLite — excludes requestDetails, keeps critical data backup file omits requestDetails rows but keeps other tables
 tests/unit/request-details-tab.test.js :: getDistinctProviders — providers route (no full-row parse) returns unique provider list without parsing data blobs
 tests/unit/request-details-tab.test.js :: request details — tab crash-risk cases oversized field → stored truncated + reparseable (no circular)
