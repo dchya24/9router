@@ -11,7 +11,8 @@
     "test": "bun --bun x vitest run --config tests/vitest.config.js",
     "cli:pack": "npm --prefix cli run pack:cli",
     "cli:publish": "npm --prefix cli run publish:cli",
-    "bench:mem": "node scripts/mem-bench.mjs hono"
+    "bench:mem": "node scripts/mem-bench.mjs hono",
+    "test:gate": "bun --bun tests/node_modules/vitest/vitest.mjs run --config tests/vitest.config.js --testTimeout=20000 --reporter=json --outputFile=test-results.json; node tests/__baseline__/verify-no-regression.mjs test-results.json"
   },
   "dependencies": {
     "@node-saml/node-saml": "^5.1.0",

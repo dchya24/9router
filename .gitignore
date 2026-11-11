@@ -99,3 +99,4 @@ graphify-out/*
 
 # static export build output
 /.next-export-build/
+test-results.json

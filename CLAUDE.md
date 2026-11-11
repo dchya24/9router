@@ -32,20 +32,32 @@ npm run cli:pack       # build + npm pack from root
 cd cli && npm run dev  # nodemon watch
 ```
 
-Tests (vitest, in `tests/`, an **independent** ESM package — not wired into root `npm test`):
+Tests (vitest, in `tests/`, an **independent** ESM package). The DB layer is Bun-only, so the suite
+MUST run under Bun, from the **repo root** (several tests resolve fixture/source paths from CWD):
 ```bash
-npm install                             # ROOT deps first — tests import from src/ which needs `open`, `undici`, etc.
-cd tests && npm install                 # then tests' own deps (vitest) → tests/node_modules (allowed by tests/.gitignore)
-npx vitest run                          # all tests; auto-discovers tests/vitest.config.js
-npx vitest run unit/capabilities.test.js   # single file (path relative to tests/)
+npm install                                # ROOT deps first — tests import from src/ (open, undici, jose, …)
+cd tests && bun install --frozen-lockfile  # tests' own deps (vitest) → tests/node_modules
+cd ..
+bun --bun x vitest run --config tests/vitest.config.js              # full suite
+bun --bun x vitest run --config tests/vitest.config.js unit/retention.test.js   # single file
+npm run test:gate                          # full suite + regression gate (see below)
 ```
-> The committed `tests/package.json` `test` script hardcodes Unix paths (`NODE_PATH=/tmp/node_modules …`) — a shared-install workaround from upstream. On Windows (or anywhere), ignore it and use the `npx vitest` form above; `vitest.config.js` resolves the `open-sse`/`@/` aliases from the repo root regardless of where vitest lives.
+> **The suite is NOT all-green on a plain checkout** (~1,976 pass / 102 fail / 46 skip on Bun 1.4.4).
+> Do not read a raw run as a verdict — gate it against the committed baseline:
+> ```bash
+> bun --bun tests/node_modules/vitest/vitest.mjs run --config tests/vitest.config.js \
+>   --testTimeout=20000 --reporter=json --outputFile=test-results.json
+> node tests/__baseline__/verify-no-regression.mjs test-results.json
+> ```
+> The gate fails only when a test outside `tests/__baseline__/known-fails.txt` fails, and its test IDs are
+> repo-relative (`tests/unit/foo.test.js :: <name>`), so it works in any checkout. After an intentional,
+> understood change in failures, re-baseline with `… verify-no-regression.mjs <report> --update`.
+> CI runs the same gate (`.github/workflows/tests.yml`, Bun 1.4.4 pinned, 20 s test timeout).
 >
-> **The suite is NOT expected to be all-green on a plain checkout.** ~938 pass, ~64 fail. Judge regressions with `tests/__baseline__/verify-no-regression.mjs`, not a raw run. Expected red:
-> - A handful catalogued in `tests/__baseline__/known-fails.txt` (oauth-cursor-auto-import, translator-request-normalization, …).
-> - `unit/embeddings.cloud.test.js` imports `cloud/src/handlers/embeddings.js` — the `cloud/` worker dir is **not in this repo**, so it always fails here.
-> - `unit/xai-oauth-service.test.js` times out (5s) when the xAI endpoint-discovery fetch isn't reachable/mocked.
-> - `real/*.real.test.js` make live provider calls — need credentials, skip otherwise.
+> Known red on a plain checkout: cursor protobuf (`cursor-agent-proto`, 35), Kiro thinking
+> (`openai-to-kiro`, 19 + `claude-kiro-direct`, 9), OAuth cursor auto-import (8), translator normalization,
+> `request-details-tab`/`db-concurrent` (they import `better-sqlite3`, which Bun cannot load), plus a few
+> network-dependent tests. `real/*.real.test.js` make live provider calls — skip unless credentials are set.
 - `*.real.test.js` under `tests/translator/real/` make live provider calls — skip unless credentials are set.
 - Regression baselines: `tests/__baseline__/verify-*.mjs` compare against committed snapshots (providers, aliases, OAuth URLs). Run these after touching provider registry / alias logic.
 
@@ -86,6 +98,7 @@ Pre-translate hook that folds bulky image context into Claude-format bodies to c
 ## Conventions & gotchas
 
 - Plain JavaScript (ESM), no TypeScript. `@/*` path alias → `src/*` (`jsconfig.json`).
+- Dashboard routes that are intentionally URL-only (no sidebar entry): `/dashboard/pxpipe` and `/dashboard/media-providers/*`.
 - `custom-server.js` wraps the Next standalone server to derive client IP from the TCP socket and strip attacker-controlled `X-Forwarded-For` — trusting forwarding headers only from a loopback reverse proxy. Preserve this when touching request/IP/rate-limit code.
 - Security-sensitive env: `JWT_SECRET` (session cookie), `INITIAL_PASSWORD` (default `123456` — must override), `API_KEY_SECRET`, `MACHINE_ID_SALT`. Full env contract in `.env.example` and ARCHITECTURE.md's env matrix.
 - Binary/protobuf upstreams (kiro EventStream, cursor protobuf, commandcode NDJSON) don't round-trip through OpenAI — they're handled inside their own executor, not the translator.

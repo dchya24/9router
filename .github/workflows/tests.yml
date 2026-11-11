@@ -1,0 +1,65 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          # Pin to the version used for the committed baseline (see
+          # tests/__baseline__/known-fails.txt) so the gate stays comparable.
+          bun-version: 1.4.4
+
+      - name: Install root dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install test dependencies
+        working-directory: tests
+        run: bun install --frozen-lockfile
+
+      # The suite is not expected to be all-green (see tests/__baseline__/).
+      # This step only produces the JSON report; the next step is the gate.
+      # Must run from the repo root: several tests resolve fixture/source paths
+      # relative to CWD (e.g. security-audit reads "src/mitm/manager.js").
+      - name: Run test suite
+        continue-on-error: true
+        run: |
+          bun --bun tests/node_modules/vitest/vitest.mjs run \
+            --config tests/vitest.config.js \
+            --testTimeout=20000 \
+            --reporter=json \
+            --outputFile=test-results.json 2>&1 | tee /tmp/vitest.log
+
+      - name: Check regressions against the known-fails baseline
+        run: node tests/__baseline__/verify-no-regression.mjs test-results.json
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-results
+          path: test-results.json
+          if-no-files-found: ignore
+
+      - name: Upload failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-log
+          path: /tmp/*.log
+          if-no-files-found: ignore
