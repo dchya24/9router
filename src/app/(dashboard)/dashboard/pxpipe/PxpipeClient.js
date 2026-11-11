@@ -194,7 +194,7 @@ export default function PxpipeClient() {
           </ResponsiveContainer>
         ) : (
           <div className="h-32 flex items-center justify-center text-text-muted text-sm">
-            No savings recorded yet — enable PXPIPE in the Token Saver and route a large Claude-format request.
+            No savings recorded yet — enable PXPIPE and route a large Claude-format request.
           </div>
         )}
       </Card>

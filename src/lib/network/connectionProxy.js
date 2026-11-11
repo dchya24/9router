@@ -1,6 +1,6 @@
 // Per-connection proxy configuration.
 //
-// Proxy Pools were removed from this fork: only the legacy per-connection proxy
+// Pool-based proxying was removed from this fork: only the legacy per-connection proxy
 // fields (connectionProxyEnabled / connectionProxyUrl / connectionNoProxy) are
 // honoured now. Stored `proxyPoolId` values on existing connections are ignored.
 
