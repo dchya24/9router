@@ -1,4 +1,16 @@
-# v0.5.69-hono.8 (unreleased)
+# v0.5.69-hono.9 (2026-11-11)
+
+## Chores
+- **Dashboard**: delete the unreachable `/dashboard/basic-chat` page (and its layout special-casing); PXPIPE empty state no longer points at the removed Token Saver page.
+- **i18n**: prune 42 literals that only the removed Token Saver / CLI Tools / Proxy Pools / Skills surfaces used (34 locale files).
+- **Docs**: drop the Headroom sidecar section and `Endpoint → Token Saver` instructions from `DOCKER.md`; document the intentionally URL-only dashboard routes.
+
+## Tests / CI
+- **Gate**: `verify-no-regression.mjs` now emits repo-relative test ids (the old `/app/` split produced `undefined :: …` outside that CI image) and gained `--update`; `known-fails.txt` re-baselined from a real Bun run (102 entries).
+- **CI**: new `.github/workflows/tests.yml` — Bun 1.4.4 pinned, suite run from the repo root with a 20 s timeout, regression gate enforced, JSON report uploaded. `npm run test:gate` mirrors it locally.
+- **Fix**: `devin-cli-executor` no longer depends on the caller's `XDG_CONFIG_HOME` (GitHub runners export it).
+
+# v0.5.69-hono.8 (2026-11-10)
 
 ## Features
 - **Dashboard**: remove the Token Saver, CLI Tools, Proxy Pools and Skills pages, plus the hidden MITM proxy page — together with their sidebar/header entries and APIs (`/api/headroom/*`, `/api/proxy-pools/*`, `/api/cli-tools/*`). PXPIPE keeps its own page and API.
